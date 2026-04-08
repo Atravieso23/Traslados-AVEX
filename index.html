@@ -601,6 +601,16 @@ input::placeholder{color:#404040;}
 <div class="page active" id="pageCalc">
 <div class="calc-wrap">
 
+  <!-- ── PEGAR ASISTENCIA ── -->
+  <div class="card" id="pasteCard" style="border:1px dashed var(--accent);background:rgba(0,200,100,.04);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);">Pegar asistencia</div>
+      <button onclick="togglePasteBlock()" id="pasteBtnToggle" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:20px;cursor:pointer;">Ocultar</button>
+    </div>
+    <textarea id="pasteInput" rows="5" placeholder="Pegá acá el texto de la asistencia..." oninput="parsearAsistencia(this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px;font-family:'Inter',monospace;padding:10px;border-radius:6px;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+    <div id="pasteStatus" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:16px;"></div>
+  </div>
+
   <div class="card">
     <div class="sec-tag">01 — Zona de operación</div>
     <div class="zone-row" id="zonePills">
@@ -1172,6 +1182,71 @@ function toggleTheme() {
     : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     {attribution:'© OpenStreetMap © CARTO',maxZoom:19}).addTo(map);
   localStorage.setItem('avex-theme', isLight ? 'light' : 'dark');
+}
+
+// ── PEGAR ASISTENCIA ──────────────────────────────────────────
+function togglePasteBlock() {
+  const ta = document.getElementById('pasteInput');
+  const btn = document.getElementById('pasteBtnToggle');
+  const visible = ta.style.display !== 'none';
+  ta.style.display = visible ? 'none' : '';
+  document.getElementById('pasteStatus').style.display = visible ? 'none' : '';
+  btn.textContent = visible ? 'Mostrar' : 'Ocultar';
+}
+
+function parsearAsistencia(txt) {
+  if (!txt.trim()) return;
+  const get = (label) => {
+    const rx = new RegExp(label + '\\s*:?\\s*(.+)', 'i');
+    const m = txt.match(rx);
+    return m ? m[1].trim() : '';
+  };
+
+  // Cliente y teléfono
+  const asegurado = get('Asegurado');
+  const tel       = get('Teléfono del asegurado');
+  const vehiculo  = get('Vehículo a asistir');
+  const patente   = get('Patente del vehículo a asistir');
+
+  if (asegurado) document.getElementById('clienteInput').value = asegurado;
+  if (tel)       document.getElementById('telefonoInput').value = tel;
+  if (vehiculo)  document.getElementById('vehiculoInput').value = vehiculo;
+  if (patente)   document.getElementById('patenteInput').value  = patente.toUpperCase();
+
+  // Parser de dirección: "Calle 1234, LOCALIDAD, ..."
+  function parseDireccion(raw) {
+    if (!raw) return null;
+    const partes = raw.split(',');
+    const primeraParte = partes[0].trim();
+    // Separa calle y altura: todo hasta el último número
+    const m = primeraParte.match(/^(.+?)\s+(\d+\w*)\s*$/);
+    const calle    = m ? m[1].trim() : primeraParte;
+    const altura   = m ? m[2] : '';
+    const localidad = partes[1] ? partes[1].trim() : '';
+    return { calle, altura, localidad };
+  }
+
+  const origen  = parseDireccion(get('Origen'));
+  const destino = parseDireccion(get('Destino'));
+
+  if (origen) {
+    document.getElementById('origenCalle').value    = origen.calle;
+    document.getElementById('origenAltura').value   = origen.altura;
+    document.getElementById('origenLocalidad').value = origen.localidad;
+    actualizarDireccion('origen');
+  }
+  if (destino) {
+    document.getElementById('destinoCalle').value    = destino.calle;
+    document.getElementById('destinoAltura').value   = destino.altura;
+    document.getElementById('destinoLocalidad').value = destino.localidad;
+    actualizarDireccion('destino');
+  }
+
+  // Feedback
+  const campos = [asegurado, tel, vehiculo, patente, origen?.calle, destino?.calle].filter(Boolean).length;
+  document.getElementById('pasteStatus').textContent = campos > 0
+    ? `✓ ${campos} campos autocompletos`
+    : '⚠ No se reconoció el formato. Verificá que el texto sea correcto.';
 }
 
 // ── ZONA ──────────────────────────────────────────────────────
