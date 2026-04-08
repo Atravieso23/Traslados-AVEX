@@ -1,0 +1,3052 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AVEX · Calculadora de Traslados</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --black:#0B0B0B; --surface:#141414; --surface2:#1C1C1C; --surface3:#222;
+  --border:#2B2B2B; --accent:#22C55E; --accent-dim:#14532D;
+  --text:#F5F5F5; --muted:#737373;
+  --blue:#3B82F6; --blue-dim:#1E3A5F;
+  --orange:#F59E0B; --orange-dim:#451A03;
+  --purple:#A78BFA; --purple-dim:#2E1065;
+  --red:#EF4444;
+}
+body.light {
+  --black:#F0F2F5; --surface:#FFF; --surface2:#F5F7FA; --surface3:#EAEEF3;
+  --border:#D8DEE8; --text:#111827; --muted:#6B7280;
+  --accent-dim:#DCFCE7; --blue-dim:#DBEAFE; --orange-dim:#FEF3C7; --purple-dim:#EDE9FE;
+}
+body.light input { background:#F5F7FA; color:#111827; }
+body.light input::placeholder { color:#9CA3AF; }
+body.light .suggestions { background:#fff; border-color:#D8DEE8; }
+body.light .sug-item { color:#111827; border-bottom-color:#F0F2F5; }
+body.light .sug-item:hover { background:#F5F7FA; }
+body.light .brow.total { background:#F5F7FA; }
+body.light .brow.movida { background:#FEF9EC; }
+body.light .brow.neta { background:#F0F2F5!important; }
+body.light .brow.prestador { background:#F0FDF4; }
+body.light .brow.avex { background:#EFF6FF; }
+body.light .brow.iva { background:#F5F3FF; }
+body.light .brow-name { color:#111827; }
+body.light .brow-desc { color:#6B7280; }
+body.light .breakdown-card,.body.light .result-header-card { background:#fff; }
+body.light .res-price { color:#111827; }
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--black);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+
+/* ── NAV TABS ── */
+.app-nav {
+  position:sticky;top:0;z-index:200;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 16px;gap:0;
+}
+.nav-logo { display:flex;align-items:center;gap:10px;padding:12px 16px 12px 0;border-right:1px solid var(--border);margin-right:8px; }
+.nav-logo img { height:24px; }
+.nav-logo-txt { font-size:16px;font-weight:700;letter-spacing:3px;color:var(--text);display:none; }
+.nav-tab {
+  padding:14px 16px;font-size:12px;font-weight:600;color:var(--muted);
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;
+  white-space:nowrap;letter-spacing:.5px;
+}
+.nav-tab:hover { color:var(--text); }
+.nav-tab.active { color:var(--accent);border-bottom-color:var(--accent); }
+.nav-spacer { flex:1; }
+.theme-toggle {
+  padding:7px 12px;border-radius:20px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--muted);font-family:'Inter',sans-serif;
+  font-size:11px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;
+}
+.theme-toggle:hover { border-color:var(--accent);color:var(--text); }
+
+/* ── PÁGINAS ── */
+.page { display:none; }
+.page.active { display:block; }
+
+/* ── CALCULADORA ── */
+.calc-wrap { max-width:780px;margin:0 auto;padding:24px 20px 60px;display:flex;flex-direction:column;gap:14px; }
+.card { background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:24px 28px; }
+.sec-tag { display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:16px; }
+.sec-tag::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:50%;display:inline-block;}
+.zone-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.zone-pill{padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;transition:all .18s;user-select:none;}
+.zone-pill:hover{border-color:var(--accent);color:var(--text);}
+.zone-pill.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);}
+.zone-note{font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:14px;padding-left:2px;}
+.route-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.field{display:flex;flex-direction:column;gap:6px;position:relative;}
+label{font-size:11px;font-weight:500;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;}
+input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:11px 14px;border-radius:5px;outline:none;transition:border-color .2s;width:100%;}
+input:focus{border-color:var(--accent);}
+input::placeholder{color:#404040;}
+.suggestions{position:absolute;top:calc(100% + 2px);left:0;right:0;background:#1e1e1e;border:1px solid var(--border);border-radius:5px;z-index:9999;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+.sug-item{padding:10px 14px;font-size:12px;color:var(--text);cursor:pointer;border-bottom:1px solid #252525;line-height:1.4;transition:background .1s;}
+.sug-item:last-child{border-bottom:none;}
+.sug-item:hover{background:#252525;color:var(--accent);}
+.factura-row{display:flex;gap:8px;margin-bottom:0;}
+.fact-pill{padding:7px 20px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;user-select:none;}
+.fact-pill:hover{border-color:var(--purple);color:var(--text);}
+.fact-pill.active{background:var(--purple-dim);border-color:var(--purple);color:var(--purple);}
+.fact-note{font-size:11px;color:var(--muted);padding-left:2px;}
+.btn{margin-top:16px;width:100%;background:var(--accent);border:none;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:14px;cursor:pointer;transition:background .2s,transform .1s;border-radius:5px;}
+.btn:hover{background:#4ADE80;}
+.btn:active{transform:scale(.99);}
+.btn:disabled{background:#1a3d28;color:#3d7a55;cursor:not-allowed;transform:none;}
+.status{font-size:12px;color:var(--muted);text-align:center;padding:10px 0 0;display:none;}
+.status.visible{display:block;}
+
+/* RESULTADO */
+.result-wrap{display:none;flex-direction:column;gap:14px;}
+.result-wrap.visible{display:flex;animation:rise .35s ease;}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.result-header-card{background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:22px 28px;position:relative;overflow:hidden;}
+.result-header-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:var(--accent);}
+.result-top{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.res-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;}
+.res-price{font-size:52px;font-weight:300;color:var(--text);line-height:1;}
+.res-cur{font-size:15px;color:var(--muted);margin-left:3px;}
+.res-badge{background:var(--accent-dim);color:var(--accent);font-size:11px;font-weight:600;letter-spacing:1px;padding:5px 12px;border-radius:20px;border:1px solid var(--accent);white-space:nowrap;}
+.res-stats{display:flex;gap:24px;flex-wrap:wrap;padding-top:16px;border-top:1px solid var(--border);margin-top:16px;}
+.stat{display:flex;flex-direction:column;gap:3px;}
+.stat-l{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:500;}
+.stat-v{font-size:13px;color:var(--text);font-weight:500;}
+
+/* BREAKDOWN */
+.breakdown-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.breakdown-title{padding:14px 20px;border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.breakdown-rows{padding:8px 0;}
+.brow{display:grid;grid-template-columns:1fr auto;padding:10px 20px;align-items:center;gap:12px;border-bottom:1px solid #1a1a1a;}
+.brow:last-child{border-bottom:none;}
+.brow.total{background:var(--surface2);}
+.brow.movida{background:#1a1a0a;}
+.brow.neta{background:#1a1a1a!important;}
+.brow.prestador{background:#0d1f16;}
+.brow.avex{background:#0d1624;}
+.brow.iva{background:#1a1228;}
+.brow-left{display:flex;flex-direction:column;gap:2px;}
+.brow-name{font-size:13px;font-weight:500;color:var(--text);}
+.brow-desc{font-size:11px;color:var(--muted);}
+.brow-amount{font-size:16px;font-weight:600;text-align:right;white-space:nowrap;}
+.brow.total .brow-amount{color:var(--text);}
+.brow.movida .brow-amount{color:var(--orange);}
+.brow.neta .brow-amount{color:var(--text);}
+.brow.prestador .brow-amount{color:var(--accent);}
+.brow.avex .brow-amount{color:var(--blue);}
+.brow.iva .brow-amount{color:var(--purple);}
+.pct-bar-wrap{margin-top:4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;width:100%;}
+.pct-bar{height:100%;border-radius:2px;}
+
+/* MAPA */
+#map{width:100%;height:300px;border-radius:6px;}
+
+/* TABLA */
+.tabla-head{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:0 0 10px;border-bottom:1px solid var(--border);margin-bottom:2px;}
+.tabla-head span{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.tabla-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:11px 8px;border-radius:4px;transition:background .15s;align-items:center;border-bottom:1px solid #1a1a1a;}
+.tabla-row:last-child{border-bottom:none;}
+.tabla-row.active{background:#0d1f16;}
+.tabla-row span{font-size:12px;color:var(--text);}
+.tabla-row .price{font-weight:600;}
+.tabla-row.active .price{color:var(--accent);}
+.chip{display:inline-block;font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+.chip.base{background:#0d1f16;color:var(--accent);border-color:var(--accent-dim);}
+.chip.active-chip{background:var(--accent-dim);color:var(--accent);border-color:var(--accent);}
+
+/* BOTONES ACCIÓN */
+.btn-presupuesto{width:100%;background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:'Inter',sans-serif;font-size:13px;font-weight:600;letter-spacing:.5px;padding:14px 20px;cursor:pointer;border-radius:5px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-presupuesto:hover{background:#0d2018;}
+.btn-confirmar-viaje{margin-top:10px;width:100%;background:var(--accent);border:none;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;padding:14px 20px;cursor:pointer;border-radius:5px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-confirmar-viaje:hover{opacity:.85;}
+
+/* MONITOR */
+.monitor-card{background:var(--surface);border:1px solid var(--accent);border-radius:8px;overflow:hidden;}
+.monitor-header{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);gap:12px;}
+.monitor-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.monitor-id{font-size:10px;color:var(--muted);letter-spacing:1px;}
+.monitor-estado{display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.estado-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:mpulse 1.5s infinite;}
+.estado-dot.done{animation:none;background:var(--muted);}
+@keyframes mpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+#monitorEstadoTxt{font-size:12px;font-weight:600;color:var(--accent);}
+.link-box{padding:14px 20px;border-bottom:1px solid var(--border);}
+.link-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.link-row{display:flex;align-items:center;gap:8px;}
+.link-url{font-size:11px;color:var(--accent);background:var(--surface2);padding:8px 12px;border-radius:4px;border:1px solid var(--border);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;}
+.btn-copy,.btn-wa{padding:8px 10px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;flex-shrink:0;display:flex;align-items:center;transition:all .2s;}
+.btn-copy:hover{border-color:var(--accent);color:var(--accent);}
+.btn-wa{background:#14532d;border-color:var(--accent);color:var(--accent);}
+.btn-wa:hover{background:var(--accent);color:#000;}
+.monitor-steps{display:flex;align-items:center;padding:16px 20px;gap:0;overflow-x:auto;}
+.ms{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;}
+.ms-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);background:var(--surface2);transition:all .4s;}
+.ms.done .ms-dot{background:var(--accent);border-color:var(--accent);}
+.ms.active .ms-dot{border-color:var(--accent);background:var(--accent-dim);animation:mpulse 1.5s infinite;}
+.ms-label{font-size:9px;color:var(--muted);text-align:center;letter-spacing:.5px;}
+.ms.done .ms-label{color:var(--accent);}
+.ms.active .ms-label{color:var(--text);}
+.ms-time{font-size:9px;color:var(--muted);text-align:center;}
+.ms-line{flex:1;height:2px;background:var(--border);min-width:12px;transition:background .4s;}
+.ms-line.done{background:var(--accent);}
+.comprobante-box{margin:16px 20px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:18px;}
+.comprobante-title{font-size:14px;font-weight:700;color:var(--accent);margin-bottom:14px;text-align:center;}
+.comprobante-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.comprobante-row:last-child{border-bottom:none;}
+.comprobante-row .cl{color:var(--muted);}
+.comprobante-row .cv{font-weight:600;color:var(--text);}
+.btn-comprobante-print{margin-top:14px;width:100%;padding:11px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;border-radius:5px;cursor:pointer;transition:all .2s;}
+.btn-comprobante-print:hover{border-color:var(--accent);color:var(--accent);}
+
+/* MODAL PRESUPUESTO */
+#modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:none;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;}
+#modalOverlay.open{display:flex;}
+#modalBox{background:var(--surface);border:1px solid var(--border);border-radius:8px;width:100%;max-width:680px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.6);}
+#printArea{padding:40px 48px;font-family:'Inter',sans-serif;color:var(--text);background:var(--surface);}
+.modal-actions{padding:16px 24px;background:var(--surface2);border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;}
+.btn-print{background:var(--accent);color:#000;border:none;border-radius:5px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;padding:10px 18px;cursor:pointer;display:flex;align-items:center;gap:7px;letter-spacing:.5px;}
+.btn-print:hover{opacity:.85;}
+.btn-close-modal{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:5px;font-family:'Inter',sans-serif;font-size:12px;padding:10px 16px;cursor:pointer;}
+.btn-close-modal:hover{background:var(--surface2);}
+.pres-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid var(--accent);}
+.pres-logo{height:32px;}
+.pres-logo-txt{font-size:22px;font-weight:700;letter-spacing:4px;color:var(--text);}
+.pres-meta{text-align:right;font-size:11px;color:var(--muted);line-height:1.8;}
+.pres-meta strong{color:var(--text);}
+.pres-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.pres-subtitle{font-size:12px;color:var(--muted);margin-bottom:24px;}
+.pres-section{margin-bottom:22px;}
+.pres-sec-label{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
+.pres-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.pres-field{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px 14px;}
+.pres-field-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
+.pres-field-value{font-size:13px;font-weight:600;color:var(--text);}
+.pres-map-box{width:100%;height:220px;border-radius:6px;overflow:hidden;margin-bottom:22px;border:1px solid var(--border);}
+.pres-total-box{background:var(--accent);border-radius:6px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.pres-total-label{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(0,0,0,.6);margin-bottom:4px;}
+.pres-total-price{font-size:36px;font-weight:700;color:#000;}
+.pres-total-cur{font-size:14px;color:rgba(0,0,0,.5);margin-left:4px;}
+.pres-total-right{text-align:right;}
+.pres-total-tipo{background:rgba(0,0,0,.15);color:#000;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:1px;display:inline-block;margin-bottom:6px;}
+.pres-total-fact{font-size:11px;color:rgba(0,0,0,.55);}
+.pres-detail-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.pres-detail-row:last-child{border-bottom:none;}
+.pres-detail-row .label{color:var(--muted);}
+.pres-detail-row .value{font-weight:600;color:var(--text);}
+.pres-footer{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);text-align:center;line-height:1.8;}
+.pres-footer strong{color:var(--accent);}
+
+/* ── HISTORIAL ── */
+.hist-wrap{max-width:780px;margin:0 auto;padding:24px 20px 60px;display:flex;flex-direction:column;gap:14px;}
+.hist-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.hist-top h2{font-size:16px;font-weight:700;color:var(--text);}
+.hist-stats{display:flex;gap:10px;flex-wrap:wrap;}
+.hist-stat{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 16px;min-width:120px;}
+.hist-stat-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.hist-stat-value{font-size:20px;font-weight:700;color:var(--text);}
+.hist-stat-value.green{color:var(--accent);}
+.hist-stat-value.blue{color:var(--blue);}
+.hist-empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.hist-empty-icon{font-size:40px;margin-bottom:12px;}
+.hist-empty p{font-size:13px;margin-top:6px;}
+.hist-viaje{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:border-color .2s;}
+.hist-viaje:hover{border-color:var(--accent);}
+.hist-viaje-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;}
+.hist-viaje-id{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted);font-family:monospace;}
+.hist-viaje-ruta{flex:1;font-size:13px;font-weight:600;color:var(--text);}
+.hist-viaje-ruta span{color:var(--muted);font-weight:400;}
+.hist-estado-badge{font-size:9px;font-weight:700;letter-spacing:1px;padding:3px 10px;border-radius:20px;text-transform:uppercase;white-space:nowrap;}
+.hist-estado-badge.pendiente{background:#1a1a0a;color:var(--orange);border:1px solid var(--orange);}
+.hist-estado-badge.en-camino,.hist-estado-badge.en-origen,.hist-estado-badge.en-destino,.hist-estado-badge.cobro{background:#0d1f16;color:var(--accent);border:1px solid var(--accent);}
+.hist-estado-badge.completado{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);}
+.hist-viaje-body{display:none;border-top:1px solid var(--border);padding:14px 18px;}
+.hist-viaje.expanded .hist-viaje-body{display:block;}
+.hist-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.hist-cell{background:var(--surface2);border-radius:4px;padding:10px 12px;}
+.hist-cell-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
+.hist-cell-value{font-size:12px;font-weight:600;color:var(--text);}
+.hist-cell-value.green{color:var(--accent);}
+.hist-cell-value.blue{color:var(--blue);}
+.hist-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.hist-btn{padding:8px 14px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;}
+.hist-btn:hover{border-color:var(--accent);color:var(--accent);}
+.hist-btn.danger:hover{border-color:var(--red);color:var(--red);}
+.hist-btn-clear{padding:8px 16px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;}
+.hist-btn-clear:hover{border-color:var(--red);color:var(--red);}
+.hist-btn-export{padding:8px 14px;border-radius:5px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.hist-btn-export:hover{background:var(--accent-dim);}
+
+/* FILTROS */
+.hist-filtros{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+.hist-filtro-group{display:flex;flex-direction:column;gap:5px;min-width:130px;flex:1;}
+.hist-filtro-group label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+.hist-filtro-group input,.hist-filtro-group select{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:12px;padding:8px 10px;border-radius:5px;outline:none;transition:border-color .2s;width:100%;}
+.hist-filtro-group input:focus,.hist-filtro-group select:focus{border-color:var(--accent);}
+.hist-filtro-group select option{background:var(--surface2);}
+.hist-filtro-reset{padding:8px 14px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;align-self:flex-end;white-space:nowrap;}
+.hist-filtro-reset:hover{border-color:var(--accent);color:var(--accent);}
+
+.btn-logout {
+  display:flex; align-items:center; gap:5px;
+  padding:6px 12px; border-radius:20px;
+  border:1px solid var(--border); background:transparent;
+  color:var(--muted); font-family:'Inter',sans-serif;
+  font-size:11px; font-weight:500; cursor:pointer;
+  transition:all .2s; white-space:nowrap;
+}
+.btn-logout:hover { border-color:#EF4444; color:#EF4444; }
+
+/* ── LOGIN ── */
+#loginScreen {
+  position:fixed; inset:0; z-index:9999;
+  background:var(--black);
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column; padding:24px;
+}
+#loginScreen.hidden { display:none; }
+.login-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:40px 36px; width:100%; max-width:360px;
+  display:flex; flex-direction:column; align-items:center; gap:20px;
+}
+.login-logo { height:36px; margin-bottom:4px; }
+.login-title { font-size:18px; font-weight:700; color:var(--text); letter-spacing:1px; }
+.login-sub { font-size:12px; color:var(--muted); margin-top:-12px; }
+.login-field { width:100%; display:flex; flex-direction:column; gap:6px; }
+.login-field label { font-size:10px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+.login-field input {
+  background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  font-family:'Inter',sans-serif; font-size:15px; padding:12px 14px;
+  border-radius:6px; outline:none; width:100%; transition:border-color .2s;
+}
+.login-field input:focus { border-color:var(--accent); }
+.login-btn {
+  width:100%; padding:13px; background:var(--accent); border:none;
+  border-radius:6px; color:#000; font-family:'Inter',sans-serif;
+  font-size:14px; font-weight:700; cursor:pointer; transition:opacity .2s;
+}
+.login-btn:hover { opacity:.85; }
+.login-error {
+  font-size:12px; color:#EF4444; text-align:center;
+  display:none; background:#450a0a; padding:8px 14px; border-radius:6px; width:100%;
+}
+.login-error.visible { display:block; }
+
+/* ── LOGIN ── */
+#modoPrestador{display:none;min-height:100vh;flex-direction:column;}
+#modoPrestador.active{display:flex;}
+.p-header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
+.p-header img{height:26px;}
+.p-header-sep{width:1px;height:22px;background:var(--border);}
+.p-header-title{font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;flex:1;}
+.p-badge{font-size:10px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:20px;text-transform:uppercase;white-space:nowrap;}
+.p-badge.pendiente{background:#1a1a0a;color:var(--orange);border:1px solid var(--orange);}
+.p-badge.en-camino{background:#0d1f16;color:var(--accent);border:1px solid var(--accent);animation:ppulse 2s infinite;}
+.p-badge.en-origen{background:#1e3a5f;color:var(--blue);border:1px solid var(--blue);}
+.p-badge.en-destino,.p-badge.cobro{background:#0d1f16;color:var(--accent);border:1px solid var(--accent);}
+.p-badge.completado{background:#1a1a1a;color:var(--muted);border:1px solid var(--border);}
+@keyframes ppulse{0%,100%{opacity:1}50%{opacity:.5}}
+.p-content{padding:16px;max-width:500px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:100px;}
+.p-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.p-card-title{padding:12px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.p-row{display:flex;gap:10px;padding:11px 16px;border-bottom:1px solid #1a1a1a;align-items:flex-start;}
+.p-row:last-child{border-bottom:none;}
+.p-row-icon{font-size:16px;margin-top:1px;flex-shrink:0;}
+.p-row-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:1px;}
+.p-row-value{font-size:13px;font-weight:500;color:var(--text);}
+.p-row-sub{font-size:11px;color:var(--muted);}
+#p-map{width:100%;height:220px;}
+.p-total{background:var(--accent);border-radius:8px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;}
+.p-total-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(0,0,0,.6);margin-bottom:2px;}
+.p-total-price{font-size:30px;font-weight:700;color:#000;}
+.p-total-cur{font-size:12px;color:rgba(0,0,0,.5);margin-left:3px;}
+.p-total-right{text-align:right;font-size:11px;color:rgba(0,0,0,.6);}
+.p-total-parte{font-size:14px;font-weight:700;color:#000;}
+.p-tl{padding:14px 16px;display:flex;flex-direction:column;gap:0;}
+.p-tl-step{display:flex;gap:12px;position:relative;}
+.p-tl-step:not(:last-child)::after{content:'';position:absolute;left:13px;top:28px;width:2px;height:calc(100% - 4px);background:var(--border);z-index:0;}
+.p-tl-step.done::after{background:var(--accent);}
+.p-tl-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;z-index:1;transition:all .3s;}
+.p-tl-step.done .p-tl-dot{background:var(--accent);border-color:var(--accent);color:#000;}
+.p-tl-step.active .p-tl-dot{border-color:var(--accent);background:var(--accent-dim);animation:ppulse 1.5s infinite;}
+.p-tl-body{padding-bottom:18px;}
+.p-tl-label{font-size:12px;font-weight:600;color:var(--text);}
+.p-tl-step.done .p-tl-label{color:var(--accent);}
+.p-tl-time{font-size:10px;color:var(--muted);margin-top:2px;}
+.p-cobro-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 16px;}
+.p-cobro-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.p-cobro-sub{font-size:11px;color:var(--muted);margin-bottom:14px;}
+.p-cobro-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.p-cobro-opt{padding:16px 10px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);cursor:pointer;text-align:center;transition:all .2s;}
+.p-cobro-opt:hover{border-color:var(--accent);}
+.p-cobro-opt.selected{border-color:var(--accent);background:var(--accent-dim);}
+.p-cobro-opt-icon{font-size:26px;margin-bottom:6px;}
+.p-cobro-opt-label{font-size:12px;font-weight:700;color:var(--text);}
+.p-cobro-opt-desc{font-size:10px;color:var(--muted);margin-top:2px;}
+.p-btn-confirmar{width:100%;padding:14px;border:none;border-radius:8px;background:var(--accent);color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:none;transition:opacity .2s;}
+.p-btn-confirmar:hover{opacity:.85;}
+.p-done-card{background:var(--surface);border:2px solid var(--accent);border-radius:8px;padding:28px 18px;text-align:center;}
+.p-done-icon{font-size:52px;margin-bottom:10px;}
+.p-done-title{font-size:20px;font-weight:700;color:var(--accent);margin-bottom:6px;}
+.p-done-sub{font-size:12px;color:var(--muted);margin-bottom:18px;}
+.p-res-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;text-align:left;}
+.p-res-row:last-child{border-bottom:none;}
+.p-res-l{color:var(--muted);}
+.p-res-v{font-weight:600;color:var(--text);}
+.p-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 16px 24px;}
+.p-btn-accion{width:100%;padding:18px;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px;}
+.p-btn-accion.iniciar{background:var(--accent);color:#000;}
+.p-btn-accion.origen{background:var(--blue);color:#fff;}
+.p-btn-accion.destino{background:var(--orange);color:#000;}
+.p-btn-accion:hover{opacity:.88;}
+.p-nav-btns{display:flex;gap:8px;margin-bottom:10px;}
+.p-btn-nav{flex:1;padding:11px;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:opacity .2s;}
+.p-btn-nav.gmaps{background:#4285F4;color:#fff;}
+.p-btn-nav.waze{background:#33CCFF;color:#000;}
+.p-btn-nav:hover{opacity:.85;}
+.p-foto-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;}
+.p-foto-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.p-foto-sub{font-size:11px;color:var(--muted);margin-bottom:12px;}
+.p-foto-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.p-foto-slot{border:2px dashed var(--border);border-radius:8px;padding:16px 10px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+.p-foto-slot:hover{border-color:var(--accent);}
+.p-foto-slot.taken{border-style:solid;border-color:var(--accent);}
+.p-foto-slot input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.p-foto-slot-icon{font-size:24px;margin-bottom:6px;}
+.p-foto-slot-label{font-size:11px;font-weight:700;color:var(--text);}
+.p-foto-slot-status{font-size:10px;color:var(--muted);margin-top:2px;}
+.p-foto-slot.taken .p-foto-slot-status{color:var(--accent);}
+.p-foto-preview{width:100%;border-radius:6px;margin-top:8px;display:none;max-height:140px;object-fit:cover;}
+.p-foto-preview.visible{display:block;}
+.hist-fotos{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.hist-foto-thumb{width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer;transition:transform .2s;}
+.hist-foto-thumb:hover{transform:scale(1.05);}
+.foto-modal{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;display:none;align-items:center;justify-content:center;padding:20px;}
+.foto-modal.open{display:flex;}
+.foto-modal img{max-width:100%;max-height:90vh;border-radius:8px;object-fit:contain;}
+.foto-modal-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:20px;width:36px;height:36px;border-radius:50%;cursor:pointer;}
+
+/* PRINT */
+@media print{
+  body *{visibility:hidden;}
+  #modalOverlay,#modalOverlay *{visibility:visible;}
+  #modalOverlay{position:absolute;top:0;left:0;padding:0;background:var(--black);}
+  #modalBox{box-shadow:none;border-radius:0;width:100%;max-width:100%;}
+  .no-print{display:none!important;}
+  #printArea{padding:24px 32px;}
+  .pres-map-box{height:200px;}
+}
+@media(max-width:540px){
+  .route-grid{grid-template-columns:1fr;}
+  .tabla-head,.tabla-row{grid-template-columns:2fr 1fr 1fr;}
+  .tabla-head span:last-child,.tabla-row span:last-child{display:none;}
+  .res-price{font-size:40px;}
+  .card,.result-header-card{padding:18px;}
+  .brow{padding:10px 14px;}
+  .hist-grid{grid-template-columns:1fr 1fr;}
+}
+
+.foto-modal{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;display:none;align-items:center;justify-content:center;padding:20px;}
+.foto-modal.open{display:flex;}
+.foto-modal img{max-width:100%;max-height:90vh;border-radius:8px;object-fit:contain;}
+.foto-modal-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:20px;width:36px;height:36px;border-radius:50%;cursor:pointer;}
+.p-nav-btns{display:flex;gap:8px;margin-bottom:8px;}
+.p-btn-nav{flex:1;padding:10px;border:none;border-radius:var(--r);font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity .15s;}
+.p-btn-nav.gmaps{background:#4285F4;color:#fff;}
+.p-btn-nav.waze{background:#33CCFF;color:#000;}
+.p-btn-nav:hover{opacity:.85;}
+.p-foto-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.p-foto-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.p-foto-sub{font-size:11px;color:var(--muted);margin-bottom:12px;}
+.p-foto-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.p-foto-slot{border:2px dashed var(--border);border-radius:var(--r);padding:14px 8px;text-align:center;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
+.p-foto-slot:hover{border-color:var(--accent);}
+.p-foto-slot.taken{border-style:solid;border-color:var(--accent);}
+.p-foto-slot input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.p-foto-slot-icon{font-size:22px;margin-bottom:4px;}
+.p-foto-slot-label{font-size:11px;font-weight:700;color:var(--text);}
+.p-foto-slot-status{font-size:10px;color:var(--muted);margin-top:2px;}
+.p-foto-slot.taken .p-foto-slot-status{color:var(--accent);}
+.p-foto-preview{width:100%;border-radius:6px;margin-top:6px;display:none;max-height:120px;object-fit:cover;}
+.p-foto-preview.visible{display:block;}
+.hist-fotos{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.hist-foto-thumb{width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer;transition:transform .2s;}
+.hist-foto-thumb:hover{transform:scale(1.05);}
+/* LIQUIDACIONES */
+.liq-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;}
+.liq-card.expanded .liq-body{display:block;}
+.liq-card.expanded .liq-header{background:var(--surface2);}
+.liq-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;border-bottom:1px solid transparent;}
+.liq-card.expanded .liq-header{border-bottom-color:var(--border);}
+.liq-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0;}
+.liq-info{flex:1;}
+.liq-nombre{font-size:14px;font-weight:700;color:var(--text);}
+.liq-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.liq-saldo{text-align:right;}
+.liq-saldo-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px;}
+.liq-saldo-monto{font-size:18px;font-weight:700;}
+.liq-saldo-monto.cobrar{color:#EF4444;}
+.liq-saldo-monto.pagar{color:var(--accent);}
+.liq-saldo-monto.neutro{color:var(--muted);}
+.liq-body{display:none;padding:14px 18px;}
+.liq-thead{display:grid;grid-template-columns:80px 1fr 100px 120px 110px 130px;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:4px;}
+.liq-thead span{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+.liq-row{display:grid;grid-template-columns:80px 1fr 100px 120px 110px 130px;gap:8px;padding:9px 0;border-bottom:1px solid #1a1a1a;align-items:center;}
+.liq-row:last-child{border-bottom:none;}
+.liq-row span{font-size:12px;color:var(--text);}
+.liq-cobro-pill{font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
+.liq-cobro-pill.efectivo{background:#1a1a0a;color:var(--orange);border:1px solid var(--orange);}
+.liq-cobro-pill.transferencia{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue);}
+.liq-accion-pill{font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
+.liq-accion-pill.cobrar{background:var(--red-dim,#450a0a);color:#EF4444;border:1px solid #EF4444;}
+.liq-accion-pill.pagar{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);}
+.liq-resumen{margin-top:14px;padding:14px 16px;background:var(--surface2);border-radius:6px;display:flex;gap:24px;flex-wrap:wrap;border:1px solid var(--border);}
+.liq-res-item{display:flex;flex-direction:column;gap:3px;}
+.liq-res-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+.liq-res-value{font-size:15px;font-weight:700;}
+.liq-print-btn{margin-top:12px;padding:8px 14px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.liq-print-btn:hover{border-color:var(--accent);color:var(--accent);}
+.liq-empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.liq-empty-icon{font-size:40px;margin-bottom:12px;}
+@media(max-width:600px){.liq-thead,.liq-row{grid-template-columns:70px 1fr 90px 100px;}.liq-thead span:nth-child(n+5),.liq-row span:nth-child(n+5){display:none;}}
+/* TARIFARIO */
+#tarifaPreview .tabla-head{grid-template-columns:2fr 1fr 1fr 1fr 1fr;}
+#tarifaPreview .tabla-row{grid-template-columns:2fr 1fr 1fr 1fr 1fr;}
+/* PRINT */
+@media print{
+  body *{visibility:hidden;}
+  #modalOverlay,#modalOverlay *,#modalCompOverlay,#modalCompOverlay *,#modalLiqOverlay,#modalLiqOverlay *{visibility:visible;}
+  #modalOverlay,#modalCompOverlay,#modalLiqOverlay{position:absolute;top:0;left:0;padding:0;background:#fff;}
+  #modalBox,#modalCompOverlay>div,#modalLiqOverlay>div{box-shadow:none;border-radius:0;width:100%;max-width:100%;}
+  .no-print{display:none!important;}
+  #printArea,#compPrintArea,#liqPrintArea{padding:24px 32px;}
+  .pres-map-box{height:200px;}
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-box">
+    <img class="login-logo" src="https://avexargentina.com/logo_avex.png" alt="AVEX"
+      onerror="this.style.display='none'">
+    <div class="login-title">AVEX</div>
+    <div class="login-sub">Panel interno · Ingresá tus credenciales</div>
+    <div class="login-field">
+      <label>Email</label>
+      <input type="email" id="loginInput" placeholder="tu@email.com"
+        onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')checkLogin()">
+    </div>
+    <div class="login-error" id="loginError">Email o contraseña incorrectos.</div>
+    <button class="login-btn" onclick="checkLogin()">Ingresar →</button>
+  </div>
+</div>
+
+<!-- MODO PRESTADOR -->
+<div id="modoPrestador">
+  <div class="p-header">
+    <img src="https://avexargentina.com/logo_avex.png" alt="AVEX" onerror="this.style.display='none'">
+    <div class="p-header-sep"></div>
+    <span class="p-header-title">Panel del Prestador</span>
+    <div class="p-badge pendiente" id="pBadge">Pendiente</div>
+  </div>
+  <div class="p-content" id="pContent">
+    <p style="color:var(--muted);text-align:center;padding:40px 0;">Cargando viaje...</p>
+  </div>
+  <div class="p-nav" id="pNav" style="display:none;">
+    <button class="p-btn-accion iniciar" id="pBtnAccion" onclick="pAccion()">
+      <span id="pBtnIcon">🚗</span><span id="pBtnTxt">Iniciar viaje al origen</span>
+    </button>
+  </div>
+</div>
+
+<!-- MODO AVEX -->
+<div id="modoAvex">
+
+<!-- NAV -->
+<nav class="app-nav">
+  <div class="nav-logo">
+    <img src="https://avexargentina.com/logo_avex.png" alt="AVEX"
+      onerror="this.style.display='none';document.getElementById('nlf').style.display='block'">
+    <span id="nlf" class="nav-logo-txt">AVEX</span>
+  </div>
+  <div class="nav-tab active" onclick="showPage('pageCalc',this)">Calculadora</div>
+  <div class="nav-tab" onclick="showPage('pageHistorial',this)" id="tabHistorial">Historial <span id="histCount" style="background:var(--accent);color:#000;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;">0</span></div>
+  <div class="nav-tab" onclick="showPage('pageLiquidaciones',this)">Liquidaciones</div>
+  <div class="nav-tab" onclick="showPage('pageTarifario',this)">Tarifario</div>
+  <div class="nav-spacer"></div>
+  <span id="userTag" style="font-size:11px;font-weight:600;color:var(--muted);padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;white-space:nowrap;"></span>
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span><span id="themeLabel">Día</span>
+  </button>
+  <button class="btn-logout" onclick="logout()" title="Cerrar sesión">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    Salir
+  </button>
+</nav>
+
+<!-- CALCULADORA -->
+<div class="page active" id="pageCalc">
+<div class="calc-wrap">
+
+  <div class="card">
+    <div class="sec-tag">01 — Zona de operación</div>
+    <div class="zone-row" id="zonePills">
+      <div class="zone-pill active" data-zone="caba" onclick="setZona(this)">CABA</div>
+      <div class="zone-pill" data-zone="norte_cercano" onclick="setZona(this)">Zona Norte · hasta Tortuguitas</div>
+      <div class="zone-pill" data-zone="norte_lejano" onclick="setZona(this)">Pilar / Tigre</div>
+    </div>
+    <div class="zone-note" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span>Movida del prestador: <span id="movimientoLabel">$17.000</span></span>
+      <div id="movidaToggleWrap" style="display:flex;align-items:center;gap:6px;cursor:pointer;" onclick="toggleMovidaActual()">
+        <div id="movidaToggleTrack" style="width:32px;height:18px;border-radius:20px;background:var(--accent);position:relative;transition:background .2s;flex-shrink:0;">
+          <div id="movidaToggleThumb" style="position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);"></div>
+        </div>
+        <span id="movidaToggleLabel" style="font-size:11px;color:var(--accent);">Activa</span>
+      </div>
+    </div>
+
+    <div class="sec-tag" style="margin-top:4px;">02 — Tipo de factura</div>
+    <div class="factura-row">
+      <div class="fact-pill" data-fact="C" onclick="setFactura(this)">Factura C</div>
+      <div class="fact-pill active" data-fact="A" onclick="setFactura(this)">Factura A · +21% IVA</div>
+    </div>
+    <div class="fact-note" id="factNote" style="margin-top:8px;margin-bottom:16px;">Factura A: el IVA se suma al presupuesto y se descuenta en el desglose.</div>
+
+    <div class="sec-tag">03 — Origen y destino</div>
+    <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block;">Origen</label>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div class="field"><label>Calle</label><input type="text" id="origenCalle" placeholder="Ej: Viamonte" oninput="actualizarDireccion('origen')"></div>
+      <div class="field"><label>Altura</label><input type="text" id="origenAltura" placeholder="300" oninput="actualizarDireccion('origen')"></div>
+      <div class="field"><label>Localidad</label><input type="text" id="origenLocalidad" placeholder="CABA" oninput="actualizarDireccion('origen')"></div>
+    </div>
+    <input type="hidden" id="origenInput">
+    <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block;">Destino</label>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:6px;">
+      <div class="field"><label>Calle</label><input type="text" id="destinoCalle" placeholder="Ej: Av. Maipú" oninput="actualizarDireccion('destino')"></div>
+      <div class="field"><label>Altura</label><input type="text" id="destinoAltura" placeholder="1300" oninput="actualizarDireccion('destino')"></div>
+      <div class="field"><label>Localidad</label><input type="text" id="destinoLocalidad" placeholder="Vicente López" oninput="actualizarDireccion('destino')"></div>
+    </div>
+    <input type="hidden" id="destinoInput">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;" id="dirPreview"></div>
+
+    <div class="sec-tag" style="margin-top:20px;">04 — Cliente y vehículo</div>
+    <div class="route-grid" style="margin-bottom:12px;">
+      <div class="field"><label>Cliente / Empresa</label><input type="text" id="clienteInput" placeholder="Ej: Juan García"></div>
+      <div class="field"><label>Teléfono / WhatsApp</label><input type="text" id="telefonoInput" placeholder="Ej: 11 5555-0000"></div>
+    </div>
+    <div class="route-grid">
+      <div class="field"><label>Vehículo (marca y modelo)</label><input type="text" id="vehiculoInput" placeholder="Ej: Toyota Corolla"></div>
+      <div class="field"><label>Patente</label><input type="text" id="patenteInput" placeholder="Ej: AB 123 CD" style="text-transform:uppercase;"></div>
+    </div>
+
+    <div class="sec-tag" style="margin-top:20px;">05 — Datos del prestador</div>
+    <div class="route-grid" style="margin-bottom:12px;">
+      <div class="field">
+        <label>Prestador</label>
+        <select id="prestadorSelect" onchange="seleccionarPrestador(this)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:11px 14px;border-radius:5px;outline:none;width:100%;">
+          <option value="">— Seleccionar prestador —</option>
+          <option value="facundo">Facundo Ocampos</option>
+          <option value="manual">+ Ingresar manualmente</option>
+        </select>
+      </div>
+      <div class="field"><label>Teléfono del prestador</label><input type="text" id="prestadorTelInput" placeholder="Ej: 11 4444-5555"></div>
+    </div>
+    <div class="route-grid" id="prestadorManualRow" style="display:none;margin-bottom:12px;">
+      <div class="field"><label>Nombre (manual)</label><input type="text" id="prestadorNombreInput" placeholder="Ej: Carlos Rodríguez"></div>
+    </div>
+    <input type="hidden" id="prestadorNombreHidden">
+    <div class="route-grid">
+      <div class="field"><label>Vehículo del prestador</label><input type="text" id="prestadorVehiculoInput" placeholder="Ej: Ford Transit Blanca"></div>
+      <div class="field"><label>Patente del prestador</label><input type="text" id="prestadorPatenteInput" placeholder="Ej: AC 456 EF" style="text-transform:uppercase;"></div>
+    </div>
+
+    <button class="btn" id="btnCalc" onclick="calcularRuta()">Calcular tarifa y revenue →</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- RESULTADO -->
+  <div class="result-wrap" id="resultWrap">
+    <div class="result-header-card">
+      <div class="result-top">
+        <div>
+          <div class="res-label" id="rPriceLabel">Total al cliente (c/ IVA)</div>
+          <div><span class="res-price" id="rPrice">—</span><span class="res-cur">ARS</span></div>
+        </div>
+        <div class="res-badge" id="rTipo">—</div>
+      </div>
+      <div class="res-stats">
+        <div class="stat"><span class="stat-l">Distancia</span><span class="stat-v" id="rKm">—</span></div>
+        <div class="stat"><span class="stat-l">Tramo</span><span class="stat-v" id="rTramo">—</span></div>
+        <div class="stat"><span class="stat-l">Tiempo estimado</span><span class="stat-v" id="rTiempo">—</span></div>
+        <div class="stat"><span class="stat-l">Zona</span><span class="stat-v" id="rZona">—</span></div>
+      </div>
+      <div style="padding:12px 16px 0;border-top:1px solid #1a1a1a;margin-top:4px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Ajustar tramo manualmente</div>
+        <div id="tramoManualPills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+    </div>
+    <div class="breakdown-card">
+      <div class="breakdown-title">Desglose de revenue</div>
+      <div class="breakdown-rows">
+        <div class="brow total"><div class="brow-left"><span class="brow-name">Tarifa base</span><span class="brow-desc">Precio del servicio sin impuestos</span></div><span class="brow-amount" id="bBruta">—</span></div>
+        <div class="brow iva" id="browIva"><div class="brow-left"><span class="brow-name">+ IVA 21%</span><span class="brow-desc">Factura A — se cobra al cliente</span></div><span class="brow-amount" id="bIva">—</span></div>
+        <div class="brow total" style="border-top:1px solid #2b2b2b;"><div class="brow-left"><span class="brow-name">Total al cliente</span><span class="brow-desc" id="bTotalDesc">Tarifa + IVA</span></div><span class="brow-amount" id="bTotal" style="font-size:18px;">—</span></div>
+        <div class="brow movida"><div class="brow-left"><span class="brow-name">− Movida del prestador</span><span class="brow-desc" id="bMovidaDesc">Costo de desplazamiento</span></div><span class="brow-amount" id="bMovida">—</span></div>
+        <div class="brow neta" style="background:#1a1a1a;"><div class="brow-left"><span class="brow-name">Base neta</span><span class="brow-desc">Sobre esta se divide el revenue</span></div><span class="brow-amount" id="bNeta">—</span></div>
+        <div class="brow prestador"><div class="brow-left"><span class="brow-name">Prestador · 60%</span><span class="brow-desc">Su ganancia por el servicio</span><div class="pct-bar-wrap"><div class="pct-bar" style="width:60%;background:#22C55E;"></div></div></div><span class="brow-amount" id="bPrestador">—</span></div>
+        <div class="brow avex"><div class="brow-left"><span class="brow-name">AVEX · 40%</span><span class="brow-desc">Revenue de la plataforma</span><div class="pct-bar-wrap"><div class="pct-bar" style="width:40%;background:#3B82F6;"></div></div></div><span class="brow-amount" id="bAvex">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTONES -->
+  <div id="btnPresupuestoWrap" style="display:none;">
+    <button class="btn-presupuesto" onclick="abrirPresupuesto()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Generar presupuesto para el cliente
+    </button>
+    <button class="btn-confirmar-viaje" onclick="confirmarViaje()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      Confirmar viaje y generar link al prestador
+    </button>
+  </div>
+
+  <!-- MONITOR -->
+  <div id="monitorPanel" style="display:none;">
+    <div class="monitor-card">
+      <div class="monitor-header">
+        <div><div class="monitor-title">Viaje en curso</div><div class="monitor-id" id="monitorId">—</div></div>
+        <div class="monitor-estado"><span class="estado-dot" id="estadoDot"></span><span id="monitorEstadoTxt">Pendiente</span></div>
+      </div>
+      <div class="link-box">
+        <div class="link-label">Link del prestador</div>
+        <div class="link-row">
+          <div class="link-url" id="linkUrl">—</div>
+          <button class="btn-copy" onclick="copiarLink()" title="Copiar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+          <button class="btn-wa" onclick="compartirWA()" title="WhatsApp"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.999 2C6.477 2 2 6.477 2 11.999c0 1.99.583 3.85 1.59 5.415L2 22l4.713-1.56A9.953 9.953 0 0011.999 22C17.522 22 22 17.522 22 11.999 22 6.477 17.522 2 11.999 2z"/></svg></button>
+        </div>
+      </div>
+      <div class="monitor-steps">
+        <div class="ms" id="ms-pendiente"><div class="ms-dot"></div><div class="ms-label">Pendiente</div><div class="ms-time" id="mst-pendiente">—</div></div>
+        <div class="ms-line" id="msl-0"></div>
+        <div class="ms" id="ms-en-camino"><div class="ms-dot"></div><div class="ms-label">En camino</div><div class="ms-time" id="mst-en-camino">—</div></div>
+        <div class="ms-line" id="msl-1"></div>
+        <div class="ms" id="ms-en-origen"><div class="ms-dot"></div><div class="ms-label">En origen</div><div class="ms-time" id="mst-en-origen">—</div></div>
+        <div class="ms-line" id="msl-2"></div>
+        <div class="ms" id="ms-en-destino"><div class="ms-dot"></div><div class="ms-label">En destino</div><div class="ms-time" id="mst-en-destino">—</div></div>
+        <div class="ms-line" id="msl-3"></div>
+        <div class="ms" id="ms-completado"><div class="ms-dot"></div><div class="ms-label">Completado</div><div class="ms-time" id="mst-completado">—</div></div>
+      </div>
+      <div id="monitorComprobante" style="display:none;">
+        <div class="comprobante-box">
+          <div class="comprobante-title">✅ Viaje completado</div>
+          <div id="comprobanteRows"></div>
+          <button class="btn-comprobante-print" onclick="abrirComprobanteModal()">🖨️ Imprimir comprobante</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAPA -->
+  <div class="card" style="padding:0;overflow:hidden;"><div id="map"></div></div>
+
+  <!-- TABLA -->
+  <div class="card">
+    <div class="sec-tag">Estructura tarifaria completa</div>
+    <div class="tabla-head"><span>Distancia</span><span>Tarifa</span><span>AVEX 40%</span><span>Tramo</span></div>
+    <div id="tablaBody"></div>
+  </div>
+
+</div>
+</div>
+
+<!-- HISTORIAL -->
+<div class="page" id="pageHistorial">
+<div class="hist-wrap">
+  <div class="hist-top">
+    <h2>Historial de viajes</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="hist-btn-export" onclick="exportarCSV()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar CSV
+      </button>
+      <button class="hist-btn-clear" onclick="limpiarHistorial()">Limpiar</button>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="hist-filtros">
+    <div class="hist-filtro-group">
+      <label>Estado</label>
+      <select id="filtroEstado" onchange="renderHistorial()">
+        <option value="">Todos</option>
+        <option value="completado">Completado</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="en-camino">En camino</option>
+        <option value="en-origen">En origen</option>
+        <option value="en-destino">En destino</option>
+      </select>
+    </div>
+    <div class="hist-filtro-group">
+      <label>Prestador</label>
+      <input type="text" id="filtroPrestador" placeholder="Nombre..." oninput="renderHistorial()">
+    </div>
+    <div class="hist-filtro-group">
+      <label>Cliente</label>
+      <input type="text" id="filtroCliente" placeholder="Nombre..." oninput="renderHistorial()">
+    </div>
+    <div class="hist-filtro-group">
+      <label>Desde</label>
+      <input type="date" id="filtroDesde" onchange="renderHistorial()">
+    </div>
+    <div class="hist-filtro-group">
+      <label>Hasta</label>
+      <input type="date" id="filtroHasta" onchange="renderHistorial()">
+    </div>
+    <div class="hist-filtro-group">
+      <label>Cobro</label>
+      <select id="filtroCobro" onchange="renderHistorial()">
+        <option value="">Todos</option>
+        <option value="efectivo">Efectivo</option>
+        <option value="transferencia">Transferencia</option>
+      </select>
+    </div>
+    <button class="hist-filtro-reset" onclick="resetFiltros()">✕ Limpiar filtros</button>
+  </div>
+
+  <div id="histStats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;"></div>
+  <div id="histResultCount" style="font-size:11px;color:var(--muted);margin-bottom:12px;"></div>
+  <div id="histLista"></div>
+</div>
+</div>
+
+
+<!-- LIQUIDACIONES -->
+<div class="page" id="pageLiquidaciones">
+<div class="hist-wrap">
+  <div class="hist-top">
+    <h2>Liquidaciones por prestador</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <label style="font-size:11px;color:var(--muted);">Desde</label>
+      <input type="date" id="liqDesde" onchange="renderLiquidaciones()" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;outline:none;">
+      <label style="font-size:11px;color:var(--muted);">Hasta</label>
+      <input type="date" id="liqHasta" onchange="renderLiquidaciones()" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;outline:none;">
+      <button class="hist-btn-export" onclick="exportarLiquidacionCSV()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar CSV
+      </button>
+    </div>
+  </div>
+  <div id="liqResumen" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
+  <div id="liqLista"></div>
+  <div id="liqPasadas"></div>
+</div>
+</div>
+
+<!-- TARIFARIO -->
+<div class="page" id="pageTarifario">
+<div class="hist-wrap">
+  <div class="hist-top">
+    <h2>Tarifario</h2>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="font-size:12px;color:var(--muted);">Los cambios se guardan automáticamente y se aplican en la calculadora.</div>
+      <button onclick="resetearTarifario()" style="padding:6px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;" onmouseover="this.style.borderColor='#EF4444';this.style.color='#EF4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">↺ Restaurar defaults</button>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="sec-tag" style="padding:14px 18px 0;">Tramos por distancia</div>
+    <div style="padding:14px 18px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 40px;gap:10px;margin-bottom:8px;">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Hasta (km)</div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Tarifa sin IVA ($)</div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Nombre del tramo</div>
+        <div></div>
+      </div>
+      <div id="tarifaRows"></div>
+      <button onclick="agregarTramo()" style="margin-top:10px;padding:8px 14px;border-radius:5px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;width:100%;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Agregar tramo</button>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="sec-tag" style="padding:14px 18px 0;">Zonas y movida del prestador</div>
+    <div style="padding:14px 18px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 40px;gap:10px;margin-bottom:8px;">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Nombre de zona</div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Movida ($)</div>
+        <div></div>
+      </div>
+      <div id="zonaRows"></div>
+      <button onclick="agregarZona()" style="margin-top:10px;padding:8px 14px;border-radius:5px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;width:100%;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Agregar zona</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec-tag" style="padding:14px 18px 0;">Vista previa del tarifario actual</div>
+    <div style="padding:14px 18px;"><div id="tarifaPreview"></div></div>
+  </div>
+</div>
+</div>
+
+<!-- DASHBOARD -->
+<!-- DASHBOARD -->
+<div class="page" id="pageDashboard">
+<div class="hist-wrap">
+
+  <div class="hist-top" style="flex-wrap:wrap;gap:12px;">
+    <h2>Dashboard</h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <label style="font-size:11px;color:var(--muted);">Desde</label>
+      <input type="date" id="dashDesde" onchange="renderDashboard()" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;outline:none;">
+      <label style="font-size:11px;color:var(--muted);">Hasta</label>
+      <input type="date" id="dashHasta" onchange="renderDashboard()" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;outline:none;">
+      <button onclick="dashSetPeriodo('mes')" id="dashBtnMes" style="font-size:11px;padding:6px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Mes actual</button>
+      <button onclick="dashSetPeriodo('30')" style="font-size:11px;padding:6px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Últimos 30 días</button>
+      <button onclick="dashSetPeriodo('todo')" style="font-size:11px;padding:6px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Todo</button>
+    </div>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div id="dashKpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;"></div>
+
+  <!-- FILA: gráfico + prestadores -->
+  <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;margin-bottom:20px;">
+    <div class="card" style="padding:16px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;">Facturación por día</div>
+      <div id="dashChartWrap" style="position:relative;height:180px;">
+        <canvas id="dashChart"></canvas>
+      </div>
+    </div>
+    <div class="card" style="padding:16px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;">Revenue por prestador</div>
+      <div id="dashPrestadores"></div>
+    </div>
+  </div>
+
+  <!-- FILA: zonas + forma de cobro -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="card" style="padding:16px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;">Viajes por zona</div>
+      <div id="dashZonas"></div>
+    </div>
+    <div class="card" style="padding:16px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;">Forma de cobro</div>
+      <div id="dashCobros"></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+</div><!-- /modoAvex -->
+
+
+<!-- MODAL FOTO -->
+<div class="foto-modal" id="fotoModal" onclick="cerrarFotoModal()">
+  <button class="foto-modal-close" onclick="cerrarFotoModal()">✕</button>
+  <img id="fotoModalImg" src="" alt="Foto del viaje">
+</div>
+
+<!-- MODAL COMPROBANTE PRINT -->
+<div id="modalCompOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:none;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:10px;width:100%;max-width:700px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5);">
+    <div id="compPrintArea" style="padding:40px 48px;font-family:'Inter',sans-serif;color:#111;background:#fff;"></div>
+    <div class="no-print" style="padding:14px 20px;background:#f8f8f8;border-top:1px solid #e8e8e8;display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="cerrarCompModal()" style="padding:9px 16px;border-radius:5px;border:1px solid #ddd;background:transparent;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">✕ Cerrar</button>
+      <button onclick="window.print()" style="padding:9px 16px;border-radius:5px;border:none;background:#22C55E;color:#000;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">🖨️ Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LIQUIDACIÓN PRINT -->
+<div id="modalLiqOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:none;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:10px;width:100%;max-width:700px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5);">
+    <div id="liqPrintArea" style="padding:40px 48px;font-family:'Inter',sans-serif;color:#111;background:#fff;"></div>
+    <div class="no-print" style="padding:14px 20px;background:#f8f8f8;border-top:1px solid #e8e8e8;display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="cerrarLiqModal()" style="padding:9px 16px;border-radius:5px;border:1px solid #ddd;background:transparent;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">✕ Cerrar</button>
+      <button onclick="window.print()" style="padding:9px 16px;border-radius:5px;border:none;background:#22C55E;color:#000;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">🖨️ Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PRESUPUESTO -->
+<div id="modalOverlay">
+  <div id="modalBox">
+    <div id="printArea"></div>
+    <div class="modal-actions no-print">
+      <button class="btn-print" onclick="window.print()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimir / PDF
+      </button>
+      <button class="btn-close-modal" onclick="cerrarPresupuesto()">✕ Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG (editable) ─────────────────────────────────────────
+const TARIFAS_DEFAULT = [
+  {max:5,        precio:50000,  label:'Hasta 5 km',   tipo:'Mínimo'   },
+  {max:10,       precio:70000,  label:'Hasta 10 km',  tipo:'Entrada'  },
+  {max:15,       precio:90000,  label:'Hasta 15 km',  tipo:'Base'     },
+  {max:20,       precio:110000, label:'Hasta 20 km',  tipo:'Estándar' },
+  {max:30,       precio:130000, label:'Hasta 30 km',  tipo:'Extendido'},
+  {max:Infinity, precio:150000, label:'Más de 30 km', tipo:'Premium'  },
+];
+const MOVIDA_DEFAULT = {
+  caba:          {nombre:'CABA',                          monto:17000, activa:true},
+  norte_cercano: {nombre:'Zona Norte · hasta Tortuguitas', monto:17000, activa:true},
+  norte_lejano:  {nombre:'Pilar / Tigre',                 monto:20000, activa:true},
+};
+function cargarTarifario() {
+  try {
+    const t = localStorage.getItem('avex-tarifas');
+    const m = localStorage.getItem('avex-movidas');
+    let tarifas = t ? JSON.parse(t) : TARIFAS_DEFAULT;
+    tarifas = tarifas.map((tr, i) => ({
+      ...tr,
+      max: (tr.max === null || tr.max === 'Infinity' || i === tarifas.length - 1) ? Infinity : Number(tr.max)
+    }));
+    // Ordenar siempre de menor a mayor, Infinity al final
+    tarifas.sort((a,b) => { if(a.max===Infinity)return 1; if(b.max===Infinity)return -1; return a.max-b.max; });
+    return { tarifas, movidas: m ? JSON.parse(m) : MOVIDA_DEFAULT };
+  } catch(e) { return { tarifas: TARIFAS_DEFAULT, movidas: MOVIDA_DEFAULT }; }
+}
+let { tarifas: TARIFAS, movidas: MOVIDA } = cargarTarifario();
+Object.keys(MOVIDA).forEach(k => {
+  if (MOVIDA[k].activa === undefined) MOVIDA[k].activa = true;
+  if (!MOVIDA[k].nombre) MOVIDA[k].nombre = MOVIDA[k].label?.replace(/\$[\d.,]+ \(/,'').replace(/\)/,'').trim() || k;
+});
+const ZONA_NOMBRES = new Proxy({}, { get: (_, k) => MOVIDA[k]?.nombre || k });
+const M_ORDEN = ['pendiente','en-camino','en-origen','en-destino','cobro','completado'];
+
+let zonaActual = Object.keys(MOVIDA)[0] || 'caba';
+let facturaActual = 'A';
+let tramoOverride = null; // índice del tramo seleccionado manualmente
+
+function renderTramoManualPills(idxActivo) {
+  const container = document.getElementById('tramoManualPills');
+  if (!container) return;
+  container.innerHTML = TARIFAS.map((t, i) => {
+    const sel = i === idxActivo;
+    const label = t.max === Infinity ? '+30 km' : `≤${t.max} km`;
+    return `<div onclick="seleccionarTramoManual(${i})" style="
+      padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;
+      border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
+      background:${sel ? 'var(--accent-dim)' : 'transparent'};
+      color:${sel ? 'var(--accent)' : 'var(--muted)'};
+      transition:all .15s;
+    ">${label} · ${t.tipo}</div>`;
+  }).join('');
+}
+
+function seleccionarTramoManual(idx) {
+  tramoOverride = idx;
+  const km = parseFloat(document.getElementById('rKm').textContent) || 0;
+  updateRevenue(km);
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+const fmt = n => '$' + Math.round(n).toLocaleString('es-AR');
+const fmtMin = s => { const m=Math.round(s/60); return m>=60?Math.floor(m/60)+'h '+(m%60)+'min':m+' min'; };
+const getTarifa = km => TARIFAS.find(t => km <= t.max);
+
+// ── TABS ──────────────────────────────────────────────────────
+function showPage(id, tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  tab.classList.add('active');
+  if (id === 'pageHistorial') renderHistorial();
+  if (id === 'pageLiquidaciones') renderLiquidaciones();
+  if (id === 'pageTarifario') renderTarifario();
+  if (id === 'pageDashboard') { setDashPeriod('mes'); }
+  if (id === 'pageDashboard') renderDashboard();
+}
+
+// ── DIRECCIÓN ESTRUCTURADA ─────────────────────────────────────
+function actualizarDireccion(tipo) {
+  const calle    = document.getElementById(tipo+'Calle').value.trim();
+  const altura   = document.getElementById(tipo+'Altura').value.trim();
+  const localidad= document.getElementById(tipo+'Localidad').value.trim();
+  const input = document.getElementById(tipo+'Input');
+  input.value = [calle, altura, localidad].filter(Boolean).join(' ');
+  delete input.dataset.lat; delete input.dataset.lon;
+  const preview = document.getElementById('dirPreview');
+  if (preview) {
+    const o = [document.getElementById('origenCalle').value.trim(), document.getElementById('origenAltura').value.trim(), document.getElementById('origenLocalidad').value.trim()].filter(Boolean).join(' ');
+    const d = [document.getElementById('destinoCalle').value.trim(), document.getElementById('destinoAltura').value.trim(), document.getElementById('destinoLocalidad').value.trim()].filter(Boolean).join(' ');
+    preview.textContent = o && d ? '📍 '+o+' → '+d : o ? '📍 Origen: '+o : '';
+  }
+}
+
+// ── PRESTADORES ───────────────────────────────────────────────
+const PRESTADORES = {
+  facundo: { nombre:'Facundo Ocampos', tel:'+54 9 11 3414-7841', vehiculo:'Mercedes Benz Vito', patente:'AE324GK' },
+};
+function seleccionarPrestador(sel) {
+  const val = sel.value;
+  const manualRow = document.getElementById('prestadorManualRow');
+  if (val === 'manual') {
+    manualRow.style.display = 'grid';
+    document.getElementById('prestadorNombreInput').value = '';
+    document.getElementById('prestadorNombreHidden').value = '';
+    document.getElementById('prestadorTelInput').value = '';
+    document.getElementById('prestadorVehiculoInput').value = '';
+    document.getElementById('prestadorPatenteInput').value = '';
+  } else if (val && PRESTADORES[val]) {
+    manualRow.style.display = 'none';
+    const p = PRESTADORES[val];
+    document.getElementById('prestadorNombreHidden').value = p.nombre;
+    document.getElementById('prestadorTelInput').value = p.tel;
+    document.getElementById('prestadorVehiculoInput').value = p.vehiculo;
+    document.getElementById('prestadorPatenteInput').value = p.patente;
+  } else {
+    manualRow.style.display = 'none';
+    document.getElementById('prestadorNombreHidden').value = '';
+  }
+}
+function getPrestadorNombre() {
+  const sel = document.getElementById('prestadorSelect').value;
+  if (sel === 'manual') return document.getElementById('prestadorNombreInput').value || '—';
+  return document.getElementById('prestadorNombreHidden').value || '—';
+}
+
+// ── MOVIDA HELPERS ─────────────────────────────────────────────
+function getMovida(zona) {
+  const z = MOVIDA[zona || zonaActual];
+  return z?.activa !== false ? (z?.monto || 0) : 0;
+}
+function toggleMovidaActual() {
+  if (!MOVIDA[zonaActual]) return;
+  MOVIDA[zonaActual].activa = MOVIDA[zonaActual].activa === false ? true : false;
+  guardarTarifario();
+  actualizarToggleMovida();
+  const km = parseFloat(document.getElementById('rKm')?.textContent);
+  if (!isNaN(km)) updateRevenue(km);
+  renderTabla(-1);
+}
+function actualizarToggleMovida() {
+  const activa = MOVIDA[zonaActual]?.activa !== false;
+  const track = document.getElementById('movidaToggleTrack');
+  const thumb = document.getElementById('movidaToggleThumb');
+  const label = document.getElementById('movidaToggleLabel');
+  const mLabel = document.getElementById('movimientoLabel');
+  if (!track) return;
+  track.style.background = activa ? 'var(--accent)' : 'var(--border)';
+  thumb.style.right = activa ? '2px' : '';
+  thumb.style.left  = activa ? '' : '2px';
+  label.textContent = activa ? 'Activa' : 'Sin movida';
+  label.style.color = activa ? 'var(--accent)' : 'var(--muted)';
+  mLabel.textContent = activa ? fmt(MOVIDA[zonaActual]?.monto || 0) : '$0';
+}
+function renderZonaPills() {
+  const container = document.getElementById('zonePills');
+  if (!container) return;
+  const todas = Object.entries(MOVIDA);
+  if (!MOVIDA[zonaActual]) zonaActual = todas[0]?.[0];
+  container.innerHTML = todas.map(([k, z]) =>
+    '<div class="zone-pill '+(k===zonaActual?'active':'')+'" data-zone="'+k+'" onclick="setZona(this)">'+z.nombre+'</div>'
+  ).join('');
+  actualizarToggleMovida();
+}
+
+// ── TEMA ──────────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  document.getElementById('themeLabel').textContent = isLight ? 'Noche' : 'Día';
+  document.getElementById('themeIcon').textContent  = isLight ? '🌙' : '☀️';
+  map.eachLayer(l => { if (l._url) map.removeLayer(l); });
+  L.tileLayer(isLight
+    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {attribution:'© OpenStreetMap © CARTO',maxZoom:19}).addTo(map);
+  localStorage.setItem('avex-theme', isLight ? 'light' : 'dark');
+}
+
+// ── ZONA ──────────────────────────────────────────────────────
+function setZona(el) {
+  document.querySelectorAll('.zone-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  zonaActual = el.dataset.zone;
+  actualizarToggleMovida();
+  renderTabla(-1);
+  if (document.getElementById('resultWrap').classList.contains('visible')) {
+    const km = parseFloat(document.getElementById('rKm').textContent);
+    if (!isNaN(km)) updateRevenue(km);
+  }
+}
+
+// ── FACTURA ───────────────────────────────────────────────────
+function setFactura(el) {
+  document.querySelectorAll('.fact-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  facturaActual = el.dataset.fact;
+  document.getElementById('factNote').textContent = facturaActual === 'A'
+    ? 'Factura A: el IVA se suma al presupuesto y se descuenta en el desglose.'
+    : 'Factura C: sin IVA. La tarifa es el total final al cliente.';
+  renderTabla(-1);
+  if (document.getElementById('resultWrap').classList.contains('visible')) {
+    const km = parseFloat(document.getElementById('rKm').textContent);
+    if (!isNaN(km)) updateRevenue(km);
+  }
+}
+
+// ── TABLA ─────────────────────────────────────────────────────
+function renderTabla(activeIdx) {
+  const movida = getMovida();
+  document.getElementById('tablaBody').innerHTML = TARIFAS.map((t,i) => {
+    const iva   = facturaActual === 'A' ? t.precio * 0.21 : 0;
+    const total = t.precio + iva;
+    const neta  = Math.max(0, t.precio - movida);
+    const avex  = neta * 0.4;
+    const active = i === activeIdx;
+    return `<div class="tabla-row${active?' active':''}" id="row${i}">
+      <span>${t.label}</span>
+      <span class="price">${fmt(total)}${iva>0?'<span style="font-size:9px;color:#A78BFA;margin-left:4px;">IVA inc.</span>':""}</span>
+      <span class="price" style="color:${active?'var(--blue)':'var(--muted)'}">${fmt(avex)}</span>
+      <span><div class="chip${t.tipo==='Base'?' base':''}${active?' active-chip':''}">${t.tipo}</div></span>
+    </div>`;
+  }).join('');
+}
+renderTabla(-1);
+
+// ── REVENUE ───────────────────────────────────────────────────
+function updateRevenue(km) {
+  // Usar tramo override si está seleccionado, sino el automático por km
+  const tAuto  = getTarifa(km);
+  const idxAuto = TARIFAS.indexOf(tAuto);
+  const idx    = tramoOverride !== null ? tramoOverride : idxAuto;
+  const t      = TARIFAS[idx] || tAuto;
+
+  const movida = getMovida();
+  const iva    = facturaActual === 'A' ? t.precio * 0.21 : 0;
+  const total  = t.precio + iva;
+  const neta   = Math.max(0, t.precio - movida);
+  const prest  = neta * 0.6;
+  const avex   = neta * 0.4;
+
+  document.getElementById('rPrice').textContent      = fmt(total);
+  document.getElementById('rPriceLabel').textContent = facturaActual === 'A' ? 'Total al cliente (c/ IVA)' : 'Total al cliente (sin IVA)';
+  document.getElementById('rTipo').textContent       = t.tipo;
+  document.getElementById('rTramo').textContent      = t.label + (tramoOverride !== null && tramoOverride !== idxAuto ? ' ✏️' : '');
+  document.getElementById('rZona').textContent       = MOVIDA[zonaActual]?.nombre || zonaActual;
+  document.getElementById('bBruta').textContent      = fmt(t.precio);
+  document.getElementById('bIva').textContent        = iva > 0 ? '+ '+fmt(iva) : '—';
+  document.getElementById('bTotal').textContent      = fmt(total);
+  document.getElementById('bTotalDesc').textContent  = facturaActual === 'A' ? 'Tarifa + IVA 21%' : 'Sin IVA (Factura C)';
+  document.getElementById('bMovida').textContent     = movida > 0 ? '− '+fmt(movida) : '—';
+  document.getElementById('bMovidaDesc').textContent = movida > 0 ? (MOVIDA[zonaActual]?.nombre||'') : 'Sin movida aplicada';
+  document.getElementById('bNeta').textContent       = fmt(neta);
+  document.getElementById('bPrestador').textContent  = fmt(prest);
+  document.getElementById('bAvex').textContent       = fmt(avex);
+  document.getElementById('browIva').style.display   = iva > 0 ? '' : 'none';
+  renderTabla(idx);
+  renderTramoManualPills(idx);
+}
+
+// ── MAPA ──────────────────────────────────────────────────────
+const map = L.map('map').setView([-34.52,-58.47],11);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OpenStreetMap © CARTO',maxZoom:19}).addTo(map);
+let routeLayer=null, mA=null, mB=null;
+const mkPin = (l,name) => L.divIcon({className:'',
+  html:`<div style="display:flex;align-items:center;gap:6px;background:#22C55E;color:#000;font-family:Inter,sans-serif;font-size:11px;font-weight:700;padding:5px 10px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.5);">${l} <span style="font-weight:400;max-width:130px;overflow:hidden;text-overflow:ellipsis;">${name}</span></div>`,
+  iconAnchor:[0,0]});
+
+// ── AUTOCOMPLETE ──────────────────────────────────────────────
+let timers={};
+async function suggest(input,listId){
+  const q=input.value.trim(),list=document.getElementById(listId);
+  if(q.length<3){list.innerHTML='';return;}
+  clearTimeout(timers[listId]);
+  timers[listId]=setTimeout(async()=>{
+    try{
+      const d=await(await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' Argentina')}&format=json&limit=6&addressdetails=1&accept-language=es`,{headers:{'User-Agent':'AVEX-App/1.0'}})).json();
+      list.innerHTML='';
+      if(!d.length){list.innerHTML='<div class="sug-item" style="color:var(--muted)">Sin resultados</div>';return;}
+      d.forEach(item=>{
+        const div=document.createElement('div');
+        div.className='sug-item';
+        div.textContent=item.display_name.split(',').slice(0,4).join(', ');
+        div.onclick=()=>{input.value=div.textContent;input.dataset.lat=item.lat;input.dataset.lon=item.lon;list.innerHTML='';};
+        list.appendChild(div);
+      });
+    }catch(e){
+      // Fallback: permitir ingreso manual sin sugerencias
+      list.innerHTML='';
+    }
+  },400);
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.field'))document.querySelectorAll('.suggestions').forEach(s=>s.innerHTML='');});
+
+async function geocode(q){
+  // Intentar varios endpoints hasta que uno funcione
+  const endpoints=[
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' Argentina')}&format=json&limit=1`,
+    `https://corsproxy.io/?${encodeURIComponent('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q+' Argentina')+'&format=json&limit=1')}`,
+  ];
+  for(const url of endpoints){
+    try{
+      const d=await(await fetch(url,{signal:AbortSignal.timeout(5000)})).json();
+      const arr=Array.isArray(d)?d:d;
+      if(arr.length)return{lat:parseFloat(arr[0].lat),lon:parseFloat(arr[0].lon)};
+    }catch(e){continue;}
+  }
+  return null;
+}
+
+// ── CALCULAR ──────────────────────────────────────────────────
+async function calcularRuta(){
+  actualizarDireccion('origen');
+  actualizarDireccion('destino');
+  const oIn=document.getElementById('origenInput');
+  const dIn=document.getElementById('destinoInput');
+  const btn=document.getElementById('btnCalc');
+  const status=document.getElementById('status');
+  if(!oIn.value.trim()||!dIn.value.trim()){alert('Completá calle, altura y localidad para origen y destino.');return;}
+  btn.disabled=true;btn.textContent='Calculando...';
+  status.textContent='🔍 Buscando ubicaciones...';status.classList.add('visible');
+  try{
+    let oLat=parseFloat(oIn.dataset.lat),oLon=parseFloat(oIn.dataset.lon);
+    let dLat=parseFloat(dIn.dataset.lat),dLon=parseFloat(dIn.dataset.lon);
+    if(!oLat||isNaN(oLat)){
+      status.textContent='🔍 Geocodificando origen...';
+      const g=await geocode(oIn.value);
+      if(!g)throw new Error('No se encontró el origen. Intentá con una dirección más completa, ej: "Viamonte 300, CABA".');
+      oLat=g.lat;oLon=g.lon;
+    }
+    if(!dLat||isNaN(dLat)){
+      status.textContent='🔍 Geocodificando destino...';
+      const g=await geocode(dIn.value);
+      if(!g)throw new Error('No se encontró el destino. Intentá con una dirección más completa.');
+      dLat=g.lat;dLon=g.lon;
+    }
+    status.textContent='🗺 Calculando ruta...';
+    let km, secs, coords;
+    try{
+      const osrmUrl=`https://router.project-osrm.org/route/v1/driving/${oLon},${oLat};${dLon},${dLat}?overview=full&geometries=geojson`;
+      let rd;
+      try{
+        rd=await(await fetch(osrmUrl,{signal:AbortSignal.timeout(6000)})).json();
+      }catch(e){
+        rd=await(await fetch(`https://corsproxy.io/?${encodeURIComponent(osrmUrl)}`,{signal:AbortSignal.timeout(8000)})).json();
+      }
+      if(!rd.routes?.length)throw new Error('sin ruta');
+      const route=rd.routes[0];
+      km=route.distance/1000;
+      secs=route.duration;
+      coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+    }catch(e){
+      // Fallback: distancia haversine en línea recta × 1.3 (factor urbano)
+      const R=6371;
+      const dLat2=(dLat-oLat)*Math.PI/180;
+      const dLon2=(dLon-oLon)*Math.PI/180;
+      const a=Math.sin(dLat2/2)**2+Math.cos(oLat*Math.PI/180)*Math.cos(dLat*Math.PI/180)*Math.sin(dLon2/2)**2;
+      const distLineal=R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+      km=distLineal*1.3;
+      secs=km/0.5*60; // ~30 km/h promedio urbano
+      coords=[[oLat,oLon],[dLat,dLon]];
+      status.textContent='⚠ Ruta aproximada (distancia en línea recta × 1.3)';
+    }
+    if(routeLayer)map.removeLayer(routeLayer);
+    if(mA)map.removeLayer(mA);
+    if(mB)map.removeLayer(mB);
+    routeLayer=L.polyline(coords,{color:'#22C55E',weight:4,opacity:.85}).addTo(map);
+    mA=L.marker([oLat,oLon],{icon:mkPin('A',oIn.value.split(',')[0])}).addTo(map);
+    mB=L.marker([dLat,dLon],{icon:mkPin('B',dIn.value.split(',')[0])}).addTo(map);
+    map.fitBounds(routeLayer.getBounds(),{padding:[48,48]});
+    document.getElementById('rKm').textContent    = km.toFixed(1)+' km';
+    document.getElementById('rTiempo').textContent= fmtMin(secs);
+    window._presData={origen:oIn.value,destino:dIn.value,oLat,oLon,dLat,dLon,km:km.toFixed(1),secs,coords};
+    tramoOverride = null; // resetear override al calcular nueva ruta
+    updateRevenue(km);
+    document.getElementById('resultWrap').classList.add('visible');
+    document.getElementById('btnPresupuestoWrap').style.display='block';
+    document.getElementById('resultWrap').scrollIntoView({behavior:'smooth',block:'nearest'});
+    status.classList.remove('visible');
+  }catch(err){
+    status.textContent='⚠ '+err.message;
+  }finally{
+    btn.disabled=false;btn.textContent='Calcular tarifa y revenue →';
+  }
+}
+document.getElementById('destinoLocalidad').addEventListener('keydown',e=>{if(e.key==='Enter')calcularRuta();});
+
+// ── VIAJES ACTIVOS (Supabase) ─────────────────────────────────
+let _viajesActivosCache = {};
+
+async function guardarViajeActivo(viaje) {
+  _viajesActivosCache[viaje.id] = viaje;
+  const { error } = await sb.from('viajes_activos').upsert(
+    { viaje_id: viaje.id, data: viaje, updated_at: new Date().toISOString() },
+    { onConflict: 'viaje_id' }
+  );
+  if (error) console.error('Error guardando viaje activo:', error);
+}
+
+async function obtenerViajeActivo(viajeId) {
+  // Primero caché local
+  if (_viajesActivosCache[viajeId]) return _viajesActivosCache[viajeId];
+  const { data, error } = await sb.from('viajes_activos').select('data').eq('viaje_id', viajeId).single();
+  if (error || !data) return null;
+  _viajesActivosCache[viajeId] = data.data;
+  return data.data;
+}
+
+// ── CONFIRMAR VIAJE ───────────────────────────────────────────
+let viajeActivoId=null, monitorInterval=null;
+
+async function confirmarViaje(){
+  const d=window._presData;
+  if(!d){alert('Primero calculá una ruta.');return;}
+  const t=getTarifa(parseFloat(d.km));
+  const movida=MOVIDA[zonaActual].monto;
+  const iva=facturaActual==='A'?t.precio*0.21:0;
+  const total=t.precio+iva;
+  const neta=Math.max(0,t.precio-movida);
+  const viajeId='V'+Date.now().toString(36).toUpperCase();
+  const viajeData={
+    id:viajeId, estado:'pendiente', timestamps:{pendiente:Date.now()},
+    createdAt:Date.now(),
+    origen:document.getElementById('origenInput').value,
+    destino:document.getElementById('destinoInput').value,
+    oLat:d.oLat,oLon:d.oLon,dLat:d.dLat,dLon:d.dLon,
+    routeCoords:d.coords,
+    km:d.km,tiempo:fmtMin(d.secs),
+    cliente:       document.getElementById('clienteInput').value||'—',
+    clienteTel:    document.getElementById('telefonoInput').value||'—',
+    vehiculoCliente:document.getElementById('vehiculoInput').value||'—',
+    patenteCliente: document.getElementById('patenteInput').value||'—',
+    prestadorNombre:getPrestadorNombre(),
+    prestadorTel:   document.getElementById('prestadorTelInput').value||'—',
+    prestadorVehiculo:document.getElementById('prestadorVehiculoInput').value||'—',
+    prestadorPatente:document.getElementById('prestadorPatenteInput').value||'—',
+    total,montoPrestador:neta*0.6,montoAvex:neta*0.4,montoIva:iva,montoMovida:movida,
+    factura:facturaActual,zona:ZONA_NOMBRES[zonaActual],
+  };
+  await guardarViajeActivo(viajeData);
+  await guardarEnHistorial(viajeData);
+  viajeActivoId=viajeId;
+  const panel=document.getElementById('monitorPanel');
+  panel.style.display='block';
+  document.getElementById('monitorId').textContent=`ID: ${viajeId}`;
+  const dataB64=btoa(unescape(encodeURIComponent(JSON.stringify(viajeData))));
+  const baseUrl=window.location.href.split('?')[0];
+  window._linkPrestador=`${baseUrl}?data=${dataB64}`;
+  window._viajeId=viajeId;
+  document.getElementById('linkUrl').textContent=`${baseUrl}?data=... (listo para copiar)`;
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  iniciarMonitoreo(viajeId);
+  actualizarContadorHistorial();
+}
+
+function iniciarMonitoreo(viajeId){
+  if(monitorInterval)clearInterval(monitorInterval);
+  actualizarMonitor(viajeId);
+  monitorInterval=setInterval(()=>actualizarMonitor(viajeId),3000);
+}
+
+async function actualizarMonitor(viajeId){
+  const v = await obtenerViajeActivo(viajeId);
+  if(!v)return;
+  const ORDEN=['pendiente','en-camino','en-origen','en-destino','completado'];
+  const idx=ORDEN.indexOf(v.estado==='cobro'?'en-destino':v.estado);
+  ORDEN.forEach((e,i)=>{
+    const ms=document.getElementById(`ms-${e}`);
+    if(!ms)return;
+    ms.className='ms'+(i<idx?' done':i===idx?' active':'');
+    const line=document.getElementById(`msl-${i}`);
+    if(line)line.classList.toggle('done',i<idx);
+    const tEl=document.getElementById(`mst-${e}`);
+    if(tEl&&v.timestamps?.[e])tEl.textContent=new Date(v.timestamps[e]).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  });
+  const LABELS={'pendiente':'Esperando al prestador','en-camino':'En camino al origen','en-origen':'Llegó al origen','en-destino':'Llegó al destino','cobro':'Confirmando cobro','completado':'Viaje completado'};
+  document.getElementById('monitorEstadoTxt').textContent=LABELS[v.estado]||v.estado;
+  if(v.estado==='completado'){
+    document.getElementById('estadoDot').classList.add('done');
+    clearInterval(monitorInterval);
+    mostrarComprobanteMonitor(v);
+    await guardarEnHistorial(v);
+    actualizarContadorHistorial();
+  }
+}
+
+function mostrarComprobanteMonitor(v){
+  const dur=v.timestamps?.completado&&v.timestamps?.['en-camino']
+    ?Math.round((v.timestamps.completado-v.timestamps['en-camino'])/60000)+' min':'—';
+  document.getElementById('comprobanteRows').innerHTML=`
+    <div class="comprobante-row"><span class="cl">ID</span><span class="cv">${v.id}</span></div>
+    <div class="comprobante-row"><span class="cl">Prestador</span><span class="cv">${v.prestadorNombre}</span></div>
+    <div class="comprobante-row"><span class="cl">Cliente</span><span class="cv">${v.cliente}</span></div>
+    <div class="comprobante-row"><span class="cl">Recorrido</span><span class="cv">${v.origen} → ${v.destino}</span></div>
+    <div class="comprobante-row"><span class="cl">Distancia</span><span class="cv">${v.km} km</span></div>
+    <div class="comprobante-row"><span class="cl">Duración</span><span class="cv">${dur}</span></div>
+    <div class="comprobante-row"><span class="cl">Total cobrado</span><span class="cv">${fmt(v.total)}</span></div>
+    <div class="comprobante-row"><span class="cl">Parte prestador</span><span class="cv" style="color:var(--accent)">${fmt(v.montoPrestador)}</span></div>
+    <div class="comprobante-row"><span class="cl">Parte AVEX</span><span class="cv" style="color:var(--blue)">${fmt(v.montoAvex)}</span></div>
+    <div class="comprobante-row"><span class="cl">Cobro</span><span class="cv">${v.formaCobro==='efectivo'?'💵 Efectivo':'🏦 Transferencia'}</span></div>
+  `;
+  document.getElementById('monitorComprobante').style.display='block';
+}
+
+function copiarLink(){
+  const link=window._linkPrestador;
+  if(!link)return;
+  navigator.clipboard.writeText(link).then(()=>{
+    const btn=document.querySelector('.btn-copy');
+    btn.innerHTML='✓';btn.style.color='var(--accent)';
+    setTimeout(()=>{btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';btn.style.color='';},2000);
+  }).catch(()=>{const ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('Link copiado');});
+}
+
+function compartirWA(){
+  if(!window._linkPrestador)return;
+  const nombre=getPrestadorNombre().split(' ')[0];
+  const origen=document.getElementById('origenInput').value;
+  const destino=document.getElementById('destinoInput').value;
+  const cliente=document.getElementById('clienteInput').value;
+  const msg=`Hola${nombre?' '+nombre:''}! Te comparto el link del viaje AVEX:\n${window._linkPrestador}\n\nOrigen: ${origen}\nDestino: ${destino}\nCliente: ${cliente}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`);
+}
+
+// ── HISTORIAL (Supabase) ───────────────────────────────────────
+let _historialCache = []; // caché local para velocidad
+
+async function cargarHistorialDesdeSupabase() {
+  const { data, error } = await sb.from('viajes').select('*').order('created_at', { ascending: false }).limit(200);
+  if (error) { console.error('Error cargando historial:', error); return; }
+  _historialCache = (data || []).map(row => row.data);
+  actualizarContadorHistorial();
+}
+
+function getHistorial() {
+  return _historialCache;
+}
+
+async function guardarEnHistorial(viaje) {
+  // Actualizar caché local
+  const idx = _historialCache.findIndex(v => v.id === viaje.id);
+  if (idx >= 0) _historialCache[idx] = viaje;
+  else _historialCache.unshift(viaje);
+
+  // Guardar en Supabase (upsert por id del viaje)
+  const { error } = await sb.from('viajes').upsert(
+    { viaje_id: viaje.id, data: viaje, created_at: new Date(viaje.createdAt).toISOString() },
+    { onConflict: 'viaje_id' }
+  );
+  if (error) console.error('Error guardando viaje:', error);
+}
+
+function actualizarContadorHistorial(){
+  const hist=getHistorial();
+  const count=document.getElementById('histCount');
+  if(hist.length>0){count.textContent=hist.length;count.style.display='inline';}
+  else{count.style.display='none';}
+}
+
+function renderHistorial(){
+  const todoHist = getHistorial();
+
+  // Leer filtros
+  const fEstado    = document.getElementById('filtroEstado')?.value    || '';
+  const fPrestador = (document.getElementById('filtroPrestador')?.value || '').toLowerCase().trim();
+  const fCliente   = (document.getElementById('filtroCliente')?.value   || '').toLowerCase().trim();
+  const fDesde     = document.getElementById('filtroDesde')?.value     || '';
+  const fHasta     = document.getElementById('filtroHasta')?.value     || '';
+  const fCobro     = document.getElementById('filtroCobro')?.value     || '';
+
+  const hist = todoHist.filter(v => {
+    if (fEstado    && v.estado !== fEstado) return false;
+    if (fPrestador && !(v.prestadorNombre||'').toLowerCase().includes(fPrestador)) return false;
+    if (fCliente   && !(v.cliente||'').toLowerCase().includes(fCliente)) return false;
+    if (fCobro     && v.formaCobro !== fCobro) return false;
+    if (fDesde) {
+      const d = new Date(v.createdAt); const desde = new Date(fDesde);
+      if (d < desde) return false;
+    }
+    if (fHasta) {
+      const d = new Date(v.createdAt); const hasta = new Date(fHasta);
+      hasta.setHours(23,59,59);
+      if (d > hasta) return false;
+    }
+    return true;
+  });
+
+  const lista   = document.getElementById('histLista');
+  const statsEl = document.getElementById('histStats');
+  const countEl = document.getElementById('histResultCount');
+
+  // Contador de resultados
+  if(countEl) countEl.textContent = hist.length !== todoHist.length
+    ? `Mostrando ${hist.length} de ${todoHist.length} viajes`
+    : `${todoHist.length} viaje${todoHist.length!==1?'s':''}`;
+
+  if(todoHist.length===0){
+    statsEl.innerHTML='';
+    lista.innerHTML=`<div class="hist-empty"><div class="hist-empty-icon">📋</div><h3 style="color:var(--text);font-size:16px;">Sin viajes aún</h3><p>Los viajes confirmados aparecerán acá automáticamente.</p></div>`;
+    return;
+  }
+
+  // Stats siempre sobre todos (no filtrados)
+  const completados = todoHist.filter(v=>v.estado==='completado');
+  const totalAvex   = completados.reduce((a,v)=>a+(v.montoAvex||0),0);
+  const totalPrest  = completados.reduce((a,v)=>a+(v.montoPrestador||0),0);
+  statsEl.innerHTML=`
+    <div class="hist-stat"><div class="hist-stat-label">Total viajes</div><div class="hist-stat-value">${todoHist.length}</div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Completados</div><div class="hist-stat-value green">${completados.length}</div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Revenue AVEX</div><div class="hist-stat-value blue">${fmt(totalAvex)}</div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Pagado prestadores</div><div class="hist-stat-value">${fmt(totalPrest)}</div></div>
+  `;
+
+  if(hist.length===0){
+    lista.innerHTML=`<div class="hist-empty"><div class="hist-empty-icon">🔍</div><h3 style="color:var(--text);font-size:15px;">Sin resultados</h3><p>Probá con otros filtros.</p></div>`;
+    return;
+  }
+
+  lista.innerHTML=hist.map(v=>{
+    const fecha=v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    const dur=v.timestamps?.completado&&v.timestamps?.['en-camino']
+      ?Math.round((v.timestamps.completado-v.timestamps['en-camino'])/60000)+' min':'—';
+    return `
+    <div class="hist-viaje" id="hv-${v.id}">
+      <div class="hist-viaje-header" onclick="toggleHistViaje('${v.id}')">
+        <div style="flex:1;">
+          <div class="hist-viaje-id">${v.id} · ${fecha}</div>
+          <div class="hist-viaje-ruta">${v.origen.split(',')[0]} <span>→</span> ${v.destino.split(',')[0]}</div>
+        </div>
+        <div class="hist-estado-badge ${v.estado}">${v.estado==='completado'?'✓ Completado':v.estado.replace('-',' ')}</div>
+      </div>
+      <div class="hist-viaje-body">
+        <div class="hist-grid">
+          <div class="hist-cell"><div class="hist-cell-label">Cliente</div><div class="hist-cell-value">${v.cliente||'—'}</div></div>
+          <div class="hist-cell"><div class="hist-cell-label">Prestador</div><div class="hist-cell-value">${v.prestadorNombre||'—'}</div></div>
+          <div class="hist-cell"><div class="hist-cell-label">Distancia</div><div class="hist-cell-value">${v.km} km</div></div>
+          <div class="hist-cell"><div class="hist-cell-label">Total cobrado</div><div class="hist-cell-value">${fmt(v.total)}</div></div>
+          <div class="hist-cell"><div class="hist-cell-label">AVEX 40%</div><div class="hist-cell-value blue">${fmt(v.montoAvex)}</div></div>
+          <div class="hist-cell"><div class="hist-cell-label">Prestador 60%</div><div class="hist-cell-value green">${fmt(v.montoPrestador)}</div></div>
+          ${v.estado==='completado'?`
+          <div class="hist-cell"><div class="hist-cell-label">Duración</div><div class="hist-cell-value">${dur}</div></div>
+          <div class="hist-cell"><div class="hist-cell-label">Cobro</div><div class="hist-cell-value">${v.formaCobro==='efectivo'?'💵 Efectivo':'🏦 Transferencia'}</div></div>
+          <div class="hist-cell"><div class="hist-cell-label">Zona</div><div class="hist-cell-value">${v.zona||'—'}</div></div>
+          `:''}
+        </div>
+        <div class="hist-actions">
+          <button class="hist-btn" onclick="reenviarLink('${v.id}')">📤 Reenviar link</button>
+          <button class="hist-btn" onclick="corregirViaje('${v.id}')" style="border-color:var(--blue);color:var(--blue);">✏️ Corregir</button>
+          <button class="hist-btn danger" onclick="eliminarViaje('${v.id}')">🗑 Eliminar</button>
+        </div>
+        ${(v.fotoOrigen||v.fotoDestino)?`
+        <div style="margin-top:10px;">
+          <div class="hist-cell-label" style="margin-bottom:6px;">📸 Fotos del viaje</div>
+          <div class="hist-fotos">
+            ${v.fotoOrigen?`<img class="hist-foto-thumb" src="${v.fotoOrigen}" alt="Origen" title="Foto al llegar al origen" onclick="verFoto('${v.fotoOrigen}')">` : ''}
+            ${v.fotoDestino?`<img class="hist-foto-thumb" src="${v.fotoDestino}" alt="Destino" title="Foto al llegar al destino" onclick="verFoto('${v.fotoDestino}')">` : ''}
+          </div>
+        </div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function resetFiltros(){
+  ['filtroEstado','filtroPrestador','filtroCliente','filtroDesde','filtroHasta','filtroCobro'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='';
+  });
+  renderHistorial();
+}
+
+function exportarCSV(){
+  const fEstado    = document.getElementById('filtroEstado')?.value    || '';
+  const fPrestador = (document.getElementById('filtroPrestador')?.value || '').toLowerCase().trim();
+  const fCliente   = (document.getElementById('filtroCliente')?.value   || '').toLowerCase().trim();
+  const fDesde     = document.getElementById('filtroDesde')?.value     || '';
+  const fHasta     = document.getElementById('filtroHasta')?.value     || '';
+  const fCobro     = document.getElementById('filtroCobro')?.value     || '';
+
+  let hist = getHistorial().filter(v => {
+    if (fEstado    && v.estado !== fEstado) return false;
+    if (fPrestador && !(v.prestadorNombre||'').toLowerCase().includes(fPrestador)) return false;
+    if (fCliente   && !(v.cliente||'').toLowerCase().includes(fCliente)) return false;
+    if (fCobro     && v.formaCobro !== fCobro) return false;
+    if (fDesde) { const d=new Date(v.createdAt); if(d<new Date(fDesde)) return false; }
+    if (fHasta) { const d=new Date(v.createdAt); const h=new Date(fHasta); h.setHours(23,59,59); if(d>h) return false; }
+    return true;
+  });
+
+  if(!hist.length){ alert('No hay viajes para exportar con los filtros actuales.'); return; }
+
+  const cols = ['ID','Fecha','Estado','Origen','Destino','KM','Tiempo','Cliente','Tel Cliente','Vehículo','Patente','Prestador','Tel Prestador','Veh Prestador','Pat Prestador','Total','AVEX 40%','Prestador 60%','Factura','Zona','Forma Cobro','Duración (min)'];
+
+  const rows = hist.map(v => {
+    const fecha = v.createdAt ? new Date(v.createdAt).toLocaleDateString('es-AR') : '';
+    const dur = v.timestamps?.completado && v.timestamps?.['en-camino']
+      ? Math.round((v.timestamps.completado - v.timestamps['en-camino'])/60000) : '';
+    return [
+      v.id, fecha, v.estado,
+      v.origen, v.destino, v.km, v.tiempo,
+      v.cliente, v.clienteTel, v.vehiculoCliente, v.patenteCliente,
+      v.prestadorNombre, v.prestadorTel, v.prestadorVehiculo, v.prestadorPatente,
+      v.total, v.montoAvex, v.montoPrestador,
+      v.factura, v.zona, v.formaCobro||'', dur
+    ].map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',');
+  });
+
+  const csv = [cols.join(','), ...rows].join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `avex-historial-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function toggleHistViaje(id){
+  document.getElementById(`hv-${id}`).classList.toggle('expanded');
+}
+
+function corregirViaje(id) {
+  const hist = getHistorial();
+  const v = hist.find(x => x.id === id);
+  if (!v) return;
+  const existing = document.getElementById('modalCorreccion');
+  if (existing) existing.remove();
+
+  const ov = ['efectivo','transferencia'];
+  const fv = ['A','C'];
+  const ol = ['💵 Efectivo','🏦 Transferencia a AVEX'];
+  const fl = ['Factura A · +IVA','Factura C · sin IVA'];
+
+  const overlay = document.createElement('div');
+  overlay.id = 'modalCorreccion';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px;width:100%;max-width:420px;display:flex;flex-direction:column;gap:16px;';
+
+  const titulo = document.createElement('div');
+  titulo.style.cssText = 'font-size:15px;font-weight:700;color:var(--text);';
+  titulo.textContent = '✏️ Corregir viaje';
+  box.appendChild(titulo);
+
+  const sub = document.createElement('div');
+  sub.style.cssText = 'font-size:11px;color:var(--muted);';
+  sub.textContent = (v.origen||'') + ' → ' + (v.destino||'');
+  box.appendChild(sub);
+
+  // Forma de cobro
+  const secCobro = document.createElement('div');
+  const lblCobro = document.createElement('label');
+  lblCobro.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;';
+  lblCobro.textContent = 'Forma de cobro';
+  secCobro.appendChild(lblCobro);
+  const rowCobro = document.createElement('div');
+  rowCobro.style.cssText = 'display:flex;gap:8px;';
+  ov.forEach((val,i) => {
+    const btn = document.createElement('div');
+    btn.style.cssText = 'flex:1;border:2px solid '+(v.formaCobro===val?'var(--accent)':'var(--border)')+';border-radius:6px;padding:10px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;';
+    btn.textContent = ol[i];
+    btn.dataset.cobro = val;
+    if (v.formaCobro===val) btn.dataset.selected = '1';
+    btn.onclick = () => {
+      rowCobro.querySelectorAll('[data-cobro]').forEach(b => { b.style.borderColor='var(--border)'; delete b.dataset.selected; });
+      btn.style.borderColor = 'var(--accent)';
+      btn.dataset.selected = '1';
+    };
+    rowCobro.appendChild(btn);
+  });
+  secCobro.appendChild(rowCobro);
+  box.appendChild(secCobro);
+
+  // Tipo de factura
+  const secFact = document.createElement('div');
+  const lblFact = document.createElement('label');
+  lblFact.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;';
+  lblFact.textContent = 'Tipo de factura';
+  secFact.appendChild(lblFact);
+  const rowFact = document.createElement('div');
+  rowFact.style.cssText = 'display:flex;gap:8px;';
+  fv.forEach((val,i) => {
+    const btn = document.createElement('div');
+    btn.style.cssText = 'flex:1;border:2px solid '+(v.factura===val?'#A78BFA':'var(--border)')+';border-radius:6px;padding:10px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;';
+    btn.textContent = fl[i];
+    btn.dataset.factura = val;
+    if (v.factura===val) btn.dataset.selected = '1';
+    btn.onclick = () => {
+      rowFact.querySelectorAll('[data-factura]').forEach(b => { b.style.borderColor='var(--border)'; delete b.dataset.selected; });
+      btn.style.borderColor = '#A78BFA';
+      btn.dataset.selected = '1';
+    };
+    rowFact.appendChild(btn);
+  });
+  secFact.appendChild(rowFact);
+  box.appendChild(secFact);
+
+  const nota = document.createElement('div');
+  nota.style.cssText = 'font-size:10px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:10px;';
+  nota.textContent = '⚠️ Al cambiar factura se recalcularán IVA, revenue AVEX y prestador automáticamente.';
+  box.appendChild(nota);
+
+  const acciones = document.createElement('div');
+  acciones.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+
+  const btnCancelar = document.createElement('button');
+  btnCancelar.style.cssText = 'padding:9px 16px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:Inter,sans-serif;font-size:12px;font-weight:600;cursor:pointer;';
+  btnCancelar.textContent = 'Cancelar';
+  btnCancelar.onclick = () => overlay.remove();
+
+  const btnGuardar = document.createElement('button');
+  btnGuardar.style.cssText = 'padding:9px 16px;border-radius:5px;border:none;background:var(--accent);color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;';
+  btnGuardar.textContent = 'Guardar cambios';
+  btnGuardar.onclick = () => {
+    const cobroSel = rowCobro.querySelector('[data-cobro][data-selected]')?.dataset.cobro || v.formaCobro;
+    const factSel  = rowFact.querySelector('[data-factura][data-selected]')?.dataset.factura || v.factura;
+    guardarCorreccion(id, cobroSel, factSel);
+    overlay.remove();
+  };
+
+  acciones.appendChild(btnCancelar);
+  acciones.appendChild(btnGuardar);
+  box.appendChild(acciones);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
+async function guardarCorreccion(id, cobro, factura) {
+  const hist = getHistorial();
+  const v = hist.find(x => x.id === id);
+  if (!v) return;
+
+  v.formaCobro = cobro;
+
+  if (factura !== v.factura) {
+    v.factura = factura;
+    const movida = v.montoMovida || 0;
+    let precio, iva;
+    if (factura === 'A') {
+      precio = v.total;
+      iva    = Math.round(precio * 0.21);
+      v.total = precio + iva;
+    } else {
+      precio = Math.round(v.total / 1.21);
+      iva    = 0;
+      v.total = precio;
+    }
+    const neta = Math.max(0, precio - movida);
+    v.montoIva       = iva;
+    v.montoPrestador = Math.round(neta * 0.6);
+    v.montoAvex      = Math.round(neta * 0.4);
+  }
+
+  await guardarEnHistorial(v);
+  // También actualizar el viaje activo si existe
+  const viajeActivo = _viajesActivosCache[id];
+  if (viajeActivo) {
+    Object.assign(viajeActivo, {formaCobro:v.formaCobro, factura:v.factura, montoIva:v.montoIva, montoPrestador:v.montoPrestador, montoAvex:v.montoAvex, total:v.total});
+    await guardarViajeActivo(viajeActivo);
+  }
+
+  renderHistorial();
+}
+
+async function reenviarLink(id){
+  let v = await obtenerViajeActivo(id);
+  if (!v) {
+    // Buscar en historial
+    v = getHistorial().find(x => x.id === id);
+  }
+  if(!v){alert('No se encontraron los datos del viaje.');return;}
+  const dataB64=btoa(unescape(encodeURIComponent(JSON.stringify(v))));
+  const baseUrl=window.location.href.split('?')[0];
+  const link=`${baseUrl}?data=${dataB64}`;
+  const nombre=v.prestadorNombre?.split(' ')[0]||'';
+  const msg=`Hola${nombre?' '+nombre:''}! Link del viaje AVEX:\n${link}\n\nOrigen: ${v.origen}\nDestino: ${v.destino}\nCliente: ${v.cliente}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`);
+}
+
+async function eliminarViaje(id){
+  if(!confirm('¿Eliminar este viaje del historial?'))return;
+  _historialCache = _historialCache.filter(v => v.id !== id);
+  delete _viajesActivosCache[id];
+  await sb.from('viajes').delete().eq('viaje_id', id);
+  await sb.from('viajes_activos').delete().eq('viaje_id', id);
+  actualizarContadorHistorial();
+  renderHistorial();
+}
+
+async function limpiarHistorial(){
+  if(!confirm('¿Limpiar todo el historial? Esta acción no se puede deshacer.'))return;
+  const ids = _historialCache.map(v => v.id);
+  _historialCache = [];
+  _viajesActivosCache = {};
+  await sb.from('viajes').delete().in('viaje_id', ids);
+  await sb.from('viajes_activos').delete().in('viaje_id', ids);
+  actualizarContadorHistorial();
+  renderHistorial();
+}
+
+// ── PRESUPUESTO ───────────────────────────────────────────────
+document.getElementById('modalOverlay').addEventListener('click',e=>{
+  if(e.target===document.getElementById('modalOverlay'))cerrarPresupuesto();
+});
+
+function abrirPresupuesto(){
+  const d=window._presData;
+  if(!d){alert('Primero calculá una ruta para generar el presupuesto.');return;}
+  const t=getTarifa(parseFloat(d.km));
+  const movida=MOVIDA[zonaActual].monto;
+  const iva=facturaActual==='A'?t.precio*0.21:0;
+  const total=t.precio+iva;
+  const cliente=document.getElementById('clienteInput').value.trim()||'—';
+  const tel=document.getElementById('telefonoInput').value.trim()||'—';
+  const vehiculo=document.getElementById('vehiculoInput').value.trim()||'—';
+  const patente=document.getElementById('patenteInput').value.trim().toUpperCase()||'—';
+  const prestNombre=getPrestadorNombre();
+  const prestTel=document.getElementById('prestadorTelInput').value.trim()||'—';
+  const prestVehiculo=document.getElementById('prestadorVehiculoInput').value.trim()||'—';
+  const prestPatente=document.getElementById('prestadorPatenteInput').value.trim().toUpperCase()||'—';
+  const fecha=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const hora=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  const nro='P-'+Date.now().toString().slice(-6);
+  const centerLat=((parseFloat(d.oLat)+parseFloat(d.dLat))/2).toFixed(5);
+  const centerLon=((parseFloat(d.oLon)+parseFloat(d.dLon))/2).toFixed(5);
+  const staticMap=`https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLon}&zoom=12&size=580x220&maptype=mapnik&markers=${d.oLat},${d.oLon},red-pushpin|${d.dLat},${d.dLon},green-pushpin`;
+  document.getElementById('printArea').innerHTML=`
+    <div class="pres-header">
+      <div><img class="pres-logo" src="https://avexargentina.com/logo_avex.png" alt="AVEX" onerror="this.style.display='none'"></div>
+      <div class="pres-meta"><div><strong>Presupuesto N°</strong> ${nro}</div><div><strong>Fecha</strong> ${fecha} · ${hora}</div><div>avexargentina.com</div></div>
+    </div>
+    <div class="pres-title">Presupuesto de traslado vehicular</div>
+    <div class="pres-subtitle">Asistencia vehicular express · AVEX Argentina</div>
+    <div class="pres-section"><div class="pres-sec-label">Cliente</div><div class="pres-grid">
+      <div class="pres-field"><div class="pres-field-label">Nombre / Empresa</div><div class="pres-field-value">${cliente}</div></div>
+      <div class="pres-field"><div class="pres-field-label">Contacto</div><div class="pres-field-value">${tel}</div></div>
+    </div></div>
+    <div class="pres-section"><div class="pres-sec-label">Vehículo del cliente</div><div class="pres-grid">
+      <div class="pres-field"><div class="pres-field-label">Marca y Modelo</div><div class="pres-field-value">${vehiculo}</div></div>
+      <div class="pres-field"><div class="pres-field-label">Patente</div><div class="pres-field-value">${patente}</div></div>
+    </div></div>
+    <div class="pres-section"><div class="pres-sec-label">Prestador asignado</div><div class="pres-grid">
+      <div class="pres-field"><div class="pres-field-label">Nombre</div><div class="pres-field-value">${prestNombre}</div></div>
+      <div class="pres-field"><div class="pres-field-label">Teléfono</div><div class="pres-field-value">${prestTel}</div></div>
+    </div><div class="pres-grid" style="margin-top:12px;">
+      <div class="pres-field"><div class="pres-field-label">Vehículo de asistencia</div><div class="pres-field-value">${prestVehiculo}</div></div>
+      <div class="pres-field"><div class="pres-field-label">Patente</div><div class="pres-field-value">${prestPatente}</div></div>
+    </div></div>
+    <div class="pres-section"><div class="pres-sec-label">Recorrido</div>
+      <div class="pres-grid" style="margin-bottom:12px;">
+        <div class="pres-field"><div class="pres-field-label">Origen</div><div class="pres-field-value">${d.origen}</div></div>
+        <div class="pres-field"><div class="pres-field-label">Destino</div><div class="pres-field-value">${d.destino}</div></div>
+      </div>
+      <div class="pres-grid" style="margin-bottom:12px;">
+        <div class="pres-field"><div class="pres-field-label">Distancia</div><div class="pres-field-value">${d.km} km</div></div>
+        <div class="pres-field"><div class="pres-field-label">Tiempo estimado</div><div class="pres-field-value">${fmtMin(d.secs)}</div></div>
+      </div>
+      <div class="pres-map-box" style="display:none;"></div>
+    </div>
+    <div class="pres-total-box">
+      <div><div class="pres-total-label">Total del servicio</div><div><span class="pres-total-price">${fmt(total)}</span><span class="pres-total-cur">ARS</span></div></div>
+      <div class="pres-total-right"><div class="pres-total-tipo">${t.tipo}</div><div class="pres-total-fact">Factura ${facturaActual}${iva>0?' · IVA 21% incluido':' · Sin IVA'}</div></div>
+    </div>
+    <div class="pres-section"><div class="pres-sec-label">Detalle</div>
+      ${iva>0?`<div class="pres-detail-row"><span class="label">Tarifa base (sin IVA)</span><span class="value">${fmt(t.precio)}</span></div><div class="pres-detail-row"><span class="label">IVA 21%</span><span class="value">${fmt(iva)}</span></div>`:''}
+      <div class="pres-detail-row"><span class="label">Zona de operación</span><span class="value">${ZONA_NOMBRES[zonaActual]}</span></div>
+      <div class="pres-detail-row"><span class="label">Tramo tarifario</span><span class="value">${t.label}</span></div>
+      <div class="pres-detail-row" style="font-weight:700;"><span class="label">Total a cobrar</span><span class="value" style="color:#22C55E;font-size:15px;">${fmt(total)}</span></div>
+    </div>
+    <div class="pres-footer">Este presupuesto es válido por 24 horas desde su emisión.<br><strong>AVEX</strong> · Asistencia vehicular express · WhatsApp: +54 9 11 6829-4554 · avexargentina.com</div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
+function cerrarPresupuesto(){
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')cerrarPresupuesto();});
+
+
+
+// ── TARIFARIO EDITOR ──────────────────────────────────────────
+function resetearTarifario(){
+  if(!confirm('¿Restaurar el tarifario a los valores por defecto? Se perderán los cambios guardados.'))return;
+  localStorage.removeItem('avex-tarifas');
+  localStorage.removeItem('avex-movidas');
+  // Recargar desde defaults
+  TARIFAS.length=0; TARIFAS_DEFAULT.forEach(t=>TARIFAS.push({...t}));
+  Object.keys(MOVIDA).forEach(k=>delete MOVIDA[k]);
+  Object.assign(MOVIDA, JSON.parse(JSON.stringify(MOVIDA_DEFAULT)));
+  renderTarifario(); renderZonaPills(); renderTabla(-1);
+  alert('Tarifario restaurado.');
+}
+
+function renderTarifario() {
+  renderFilasTarifas();
+  renderFilasZonas();
+  renderPreviewTarifario();
+}
+function renderFilasTarifas() {
+  const c = document.getElementById('tarifaRows');
+  if(!c)return;
+  c.innerHTML = TARIFAS.map((t,i) => {
+    const esUltimo = i === TARIFAS.length-1;
+    return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 40px;gap:10px;margin-bottom:8px;align-items:center;">
+      <input type="${esUltimo?'text':'number'}" value="${esUltimo?'∞':t.max}" ${esUltimo?'disabled':''} min="1"
+        oninput="actualizarTramo(${i},'max',this.value)"
+        style="background:var(--surface2);border:1px solid var(--border);color:${esUltimo?'var(--muted)':'var(--text)'};font-family:'Inter',sans-serif;font-size:13px;padding:9px 12px;border-radius:5px;outline:none;width:100%;${esUltimo?'opacity:.5':''}">
+      <input type="number" value="${t.precio}" min="0" step="1000"
+        oninput="actualizarTramo(${i},'precio',this.value)"
+        style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:9px 12px;border-radius:5px;outline:none;width:100%;">
+      <input type="text" value="${t.tipo}" placeholder="Nombre"
+        oninput="actualizarTramo(${i},'tipo',this.value)"
+        style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:9px 12px;border-radius:5px;outline:none;width:100%;">
+      <div>${TARIFAS.length>1&&!esUltimo?`<button onclick="eliminarTramo(${i})" style="width:32px;height:32px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.borderColor='#EF4444';this.style.color='#EF4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕</button>`:''}</div>
+    </div>`;
+  }).join('');
+}
+function renderFilasZonas() {
+  const c = document.getElementById('zonaRows');
+  if(!c)return;
+  const keys = Object.keys(MOVIDA);
+  c.innerHTML = keys.map(k => {
+    const z = MOVIDA[k];
+    return `<div style="display:grid;grid-template-columns:1fr 1fr 40px;gap:10px;margin-bottom:8px;align-items:center;">
+      <input type="text" value="${z.nombre}" placeholder="Ej: CABA"
+        oninput="actualizarZona('${k}','nombre',this.value)"
+        style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:9px 12px;border-radius:5px;outline:none;width:100%;">
+      <input type="number" value="${z.monto}" min="0" step="1000"
+        oninput="actualizarZona('${k}','monto',this.value)"
+        style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:9px 12px;border-radius:5px;outline:none;width:100%;">
+      <div>${keys.length>1?`<button onclick="eliminarZona('${k}')" style="width:32px;height:32px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.borderColor='#EF4444';this.style.color='#EF4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕</button>`:''}</div>
+    </div>`;
+  }).join('');
+}
+function actualizarTramo(i,campo,val){
+  if(campo==='max') TARIFAS[i].max=parseInt(val)||0;
+  else if(campo==='precio') TARIFAS[i].precio=parseInt(val)||0;
+  else if(campo==='tipo') TARIFAS[i].tipo=val;
+  if(campo==='max'&&i<TARIFAS.length-1) TARIFAS[i].label=`Hasta ${TARIFAS[i].max} km`;
+  guardarTarifario();
+}
+function agregarTramo(){
+  const ultimo=TARIFAS[TARIFAS.length-1]; const pen=TARIFAS[TARIFAS.length-2];
+  const nMax=pen?(pen.max+10):10;
+  TARIFAS.splice(TARIFAS.length-1,0,{max:nMax,precio:ultimo.precio,label:`Hasta ${nMax} km`,tipo:'Nuevo'});
+  guardarTarifario(); renderFilasTarifas(); renderPreviewTarifario();
+}
+function eliminarTramo(i){
+  if(TARIFAS.length<=2){alert('Necesitás al menos 2 tramos.');return;}
+  TARIFAS.splice(i,1); guardarTarifario(); renderFilasTarifas(); renderPreviewTarifario();
+}
+function actualizarZona(key,campo,val){
+  if(campo==='nombre') MOVIDA[key].nombre=val;
+  if(campo==='monto')  MOVIDA[key].monto=parseInt(val)||0;
+  guardarTarifario();
+}
+function agregarZona(){
+  const key='zona_'+Date.now();
+  MOVIDA[key]={nombre:'Nueva zona',monto:0,activa:true};
+  guardarTarifario(); renderFilasZonas(); renderZonaPills();
+}
+function eliminarZona(key){
+  if(Object.keys(MOVIDA).length<=1){alert('Necesitás al menos una zona.');return;}
+  if(!confirm(`¿Eliminar la zona "${MOVIDA[key].nombre}"?`))return;
+  delete MOVIDA[key];
+  if(zonaActual===key) zonaActual=Object.keys(MOVIDA)[0];
+  guardarTarifario(); renderFilasZonas(); renderZonaPills();
+}
+function guardarTarifario(){
+  Object.keys(MOVIDA).forEach(k=>{ MOVIDA[k].label=`${fmt(MOVIDA[k].monto)} (${MOVIDA[k].nombre})`; });
+  // Mantener el último (Infinity) al final y ordenar el resto por max asc
+  TARIFAS.sort((a,b) => {
+    if (a.max === Infinity) return 1;
+    if (b.max === Infinity) return -1;
+    return a.max - b.max;
+  });
+  localStorage.setItem('avex-tarifas',JSON.stringify(TARIFAS));
+  localStorage.setItem('avex-movidas',JSON.stringify(MOVIDA));
+  renderZonaPills(); renderTabla(-1); renderPreviewTarifario();
+}
+function renderPreviewTarifario(){
+  const el=document.getElementById('tarifaPreview'); if(!el)return;
+  const movida=getMovida();
+  el.innerHTML=`
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Zona: <strong style="color:var(--text);">${MOVIDA[zonaActual]?.nombre||zonaActual}</strong> · Movida: <strong style="color:var(--accent);">${fmt(movida)}</strong></div>
+    <div class="tabla-head"><span>Distancia</span><span>Sin IVA</span><span>Con IVA</span><span>AVEX 40%</span><span>Prestador 60%</span></div>
+    ${TARIFAS.map(t=>{
+      const iva=t.precio*.21; const neta=Math.max(0,t.precio-movida);
+      return `<div class="tabla-row"><span>${t.label}</span><span class="price">${fmt(t.precio)}</span><span class="price" style="color:var(--muted);font-size:11px;">${fmt(t.precio+iva)}</span><span class="price" style="color:var(--blue);">${fmt(neta*.4)}</span><span class="price" style="color:var(--accent);">${fmt(neta*.6)}</span></div>`;
+    }).join('')}`;
+}
+
+// ── LIQUIDACIONES ─────────────────────────────────────────────
+function renderLiquidaciones(){
+  const desde=document.getElementById('liqDesde')?.value||'';
+  const hasta=document.getElementById('liqHasta')?.value||'';
+  const viajes=getHistorial().filter(v=>{
+    if(v.estado!=='completado')return false;
+    if(v.liquidado)return false;
+    if(desde){if(new Date(v.createdAt)<new Date(desde))return false;}
+    if(hasta){const h=new Date(hasta);h.setHours(23,59,59);if(new Date(v.createdAt)>h)return false;}
+    return true;
+  });
+  const lista=document.getElementById('liqLista');
+  const resEl=document.getElementById('liqResumen');
+  if(!viajes.length){
+    resEl.innerHTML='';
+    lista.innerHTML=`<div class="liq-empty"><div class="liq-empty-icon">✅</div><h3 style="color:var(--text);font-size:16px;margin-bottom:6px;">Todo liquidado</h3><p style="font-size:13px;">No hay viajes pendientes de liquidar.</p></div>`;
+    renderLiquidacionesPasadas(); return;
+  }
+  const porPrestador={};
+  viajes.forEach(v=>{const n=v.prestadorNombre||'Sin nombre';if(!porPrestador[n])porPrestador[n]=[];porPrestador[n].push(v);});
+
+  // Stats globales
+  let gTotalFact=0, gIva=0, gRevAvex=0, gRevPrest=0;
+  viajes.forEach(v=>{
+    gTotalFact+=(v.total||0);
+    gIva+=(v.montoIva||0);
+    gRevAvex+=(v.montoAvex||0);
+    gRevPrest+=(v.montoPrestador||0);
+  });
+  const gPagoAPrest = gRevPrest * 1.21; // lo que AVEX le transfiere incluyendo IVA del prestador
+  const gIvaPrest   = gRevPrest * 0.21; // crédito fiscal de AVEX
+
+  resEl.innerHTML=`
+    <div class="hist-stat"><div class="hist-stat-label">Prestadores</div><div class="hist-stat-value">${Object.keys(porPrestador).length}</div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Viajes</div><div class="hist-stat-value green">${viajes.length}</div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Total facturado</div><div class="hist-stat-value">${fmt(gTotalFact)}</div></div>
+    <div class="hist-stat"><div class="hist-stat-label">IVA débito → AFIP</div><div class="hist-stat-value" style="color:#A78BFA;">${fmt(gIva)}</div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Revenue AVEX</div><div class="hist-stat-value" style="color:var(--blue);">${fmt(gRevAvex)}</div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Pago a prestadores</div><div class="hist-stat-value" style="color:var(--accent);">${fmt(gPagoAPrest)}<span style="font-size:10px;color:var(--muted);display:block;">incl. IVA ${fmt(gIvaPrest)}</span></div></div>
+  `;
+
+  // CSS para 7 columnas
+  const gridCols = '70px 1fr 90px 65px 85px 75px 95px 85px 100px';
+
+  lista.innerHTML=Object.entries(porPrestador).map(([nombre,vjs])=>{
+    // ── Acumuladores separados por quien cobró ──
+    let cobradoPrest=0, revPrestEfectivo=0, movPrest=0;   // viajes donde cobró el prestador
+    let cobradoAvex=0,  revAvexTransf=0,    movAvex=0;    // viajes donde cobró AVEX
+    let totalFact=0, totalIva=0, totalRevAvex=0, totalRevPrest=0, totalMovida=0;
+
+    vjs.forEach(v=>{
+      const movida=v.montoMovida||0;
+      totalFact    +=(v.total||0);
+      totalIva     +=(v.montoIva||0);
+      totalRevAvex +=(v.montoAvex||0);
+      totalRevPrest+=(v.montoPrestador||0);
+      totalMovida  +=movida;
+      if(v.formaCobro==='efectivo'){
+        cobradoPrest   +=(v.total||0);
+        revPrestEfectivo+=(v.montoPrestador||0);
+        movPrest       +=movida;
+      } else {
+        cobradoAvex  +=(v.total||0);
+        revAvexTransf+=(v.montoPrestador||0);
+        movAvex      +=movida;
+      }
+    });
+
+    // Lo que el prestador le debe pasar a AVEX (viajes efectivo):
+    // cobró el total → le devuelve Rev.AVEX + IVA (AVEX se queda con su 40% + IVA)
+    const prestDebeAAvex = cobradoPrest - (revPrestEfectivo + movPrest) * 1.21;
+
+    // Lo que AVEX le debe pagar al prestador (viajes transferencia):
+    // AVEX cobró todo → le paga (60% + movida) × 1.21
+    const avexDebeAPrest = (revAvexTransf + movAvex) * 1.21;
+
+    // Movimiento neto (desde perspectiva de AVEX):
+    // + prestDebeAAvex = entra plata a AVEX
+    // - avexDebeAPrest = sale plata de AVEX
+    const movimiento = prestDebeAAvex - avexDebeAPrest;
+    const saldoLabel = movimiento > 0 ? 'Prestador paga a AVEX' : movimiento < 0 ? 'AVEX paga al prestador' : 'Saldo neutro';
+    const saldoClass = movimiento > 0 ? 'cobrar' : movimiento < 0 ? 'pagar' : 'neutro';
+    const saldoMonto = fmt(Math.abs(movimiento));
+
+    // Para el botón marcar como liquidado usamos el neto
+    const neto = movimiento;
+
+    const pagoAPrest = (totalRevPrest + totalMovida) * 1.21;
+    const ivaPrest   = (totalRevPrest + totalMovida) * 0.21;
+
+    const id='liq_'+nombre.replace(/\W/g,'_');
+    const inicial=nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+
+    const tdStyle = 'padding:9px 10px;font-size:12px;border-bottom:1px solid #1a1a1a;vertical-align:middle;';
+    const thStyle = 'padding:8px 10px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;';
+
+    const filas=vjs.map(v=>{
+      const fecha=v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}):'—';
+      const iva=v.montoIva||0;
+      const base=(v.total||0)-iva;
+      const revPrest=v.montoPrestador||0;
+      const revAvex=v.montoAvex||0;
+      const movida=v.montoMovida||0;
+      const esCash=v.formaCobro==='efectivo';
+      return `<tr>
+        <td style="${tdStyle}color:var(--text);">${fecha}</td>
+        <td style="${tdStyle}font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);">${(v.origen||'').split(',')[0]} → ${(v.destino||'').split(',')[0]}</td>
+        <td style="${tdStyle}font-weight:600;color:var(--text);text-align:right;">${fmt(v.total)}</td>
+        <td style="${tdStyle}color:#A78BFA;font-weight:600;text-align:right;">${iva>0?fmt(iva):'—'}</td>
+        <td style="${tdStyle}color:var(--muted);text-align:right;">${fmt(base)}</td>
+        <td style="${tdStyle}color:var(--orange,#F59E0B);font-weight:600;text-align:right;">${movida>0?fmt(movida):'—'}</td>
+        <td style="${tdStyle}color:var(--accent);font-weight:600;text-align:right;">${fmt(revPrest)}</td>
+        <td style="${tdStyle}color:var(--blue);font-weight:600;text-align:right;">${fmt(revAvex)}</td>
+        <td style="${tdStyle}text-align:center;"><span class="liq-cobro-pill ${v.formaCobro||''}">${esCash?'💵 Efectivo':'🏦 Transf.'}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Resumen en dos bloques como la planilla
+    // IVA solo de viajes donde cobró AVEX (transferencia)
+    // Posición del prestador (todos los viajes del período)
+    const totalPrestSinIva = totalRevPrest + totalMovida;
+    const ivaSobrePrest    = totalPrestSinIva * 0.21;
+    const totalPrestCIva   = totalPrestSinIva * 1.21;
+
+    // Posición de AVEX (todos los viajes del período)
+    const totalRevAvexPeriodo = totalRevAvex;
+    const totalIvaPeriodo     = totalIva;
+    const totalAvexPeriodo    = totalRevAvexPeriodo + totalIvaPeriodo;
+
+    // Neteo de caja
+    // AVEX le debe al prestador totalPrestCIva, pero el prestador ya cobró cobradoPrest por cuenta de AVEX
+    const avexDebeNetoAPrest = totalPrestCIva - cobradoPrest; // >0 AVEX paga, <0 prestador paga
+
+    const resumenHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:16px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">👤 Posición del prestador</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">${nombre}</div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Revenue traslados (60%)</span><span style="font-weight:600;color:var(--accent);">${fmt(totalRevPrest)}</span></div>
+          ${totalMovida>0?`<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Movidas</span><span style="font-weight:600;color:var(--orange,#F59E0B);">${fmt(totalMovida)}</span></div>`:''}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Subtotal</span><span style="font-weight:600;">${fmt(totalPrestSinIva)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">IVA (21%)</span><span style="font-weight:600;color:#A78BFA;">${fmt(ivaSobrePrest)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;font-weight:700;border-bottom:2px solid var(--border);margin-bottom:8px;"><span>Total c/IVA</span><span style="color:var(--accent);">${fmt(totalPrestCIva)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Cobrado por el prestador</span><span style="font-weight:600;">${fmt(cobradoPrest)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:7px 0;font-size:13px;font-weight:700;margin-top:2px;">
+            <span style="color:${avexDebeNetoAPrest>=0?'var(--accent)':'#EF4444'};">${avexDebeNetoAPrest>=0?'AVEX paga al prestador':'Prestador paga a AVEX'}</span>
+            <span style="color:${avexDebeNetoAPrest>=0?'var(--accent)':'#EF4444'};">${fmt(Math.abs(avexDebeNetoAPrest))}</span>
+          </div>
+        </div>
+
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:16px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">🏢 Posición de AVEX</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">AVEX</div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Revenue traslados (40%)</span><span style="font-weight:600;color:var(--blue);">${fmt(totalRevAvexPeriodo)}</span></div>
+          ${totalIvaPeriodo>0?`<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">IVA cobrado</span><span style="font-weight:600;color:#A78BFA;">${fmt(totalIvaPeriodo)}</span></div>`:''}
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;font-weight:700;border-bottom:2px solid var(--border);margin-bottom:8px;"><span>Total AVEX</span><span style="color:var(--blue);">${fmt(totalAvexPeriodo)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Cobrado por AVEX</span><span style="font-weight:600;">${fmt(cobradoAvex)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:7px 0;font-size:13px;font-weight:700;margin-top:2px;">
+            <span style="color:${avexDebeNetoAPrest<0?'#EF4444':'var(--blue)'};">${avexDebeNetoAPrest<0?'Prestador paga a AVEX':'Saldo pendiente al prestador'}</span>
+            <span style="color:${avexDebeNetoAPrest<0?'#EF4444':'var(--blue)'};">${fmt(Math.abs(avexDebeNetoAPrest))}</span>
+          </div>
+          ${ivaSobrePrest>0?`<div style="font-size:10px;color:var(--muted);margin-top:4px;">Crédito fiscal prest.: ${fmt(ivaSobrePrest)}</div>`:''}
+        </div>
+
+      </div>
+
+      <div style="margin-top:10px;background:${avexDebeNetoAPrest<0?'rgba(239,68,68,.08)':'rgba(34,197,94,.08)'};border:1px solid ${avexDebeNetoAPrest<0?'#EF4444':'var(--accent)'};border-radius:6px;padding:14px 16px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">⚖️ Neteo del período</div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;"><span style="color:var(--muted);">Le corresponde al prestador c/IVA</span><span style="font-weight:600;color:var(--accent);">${fmt(totalPrestCIva)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;"><span style="color:var(--muted);">Cobrado por el prestador</span><span style="font-weight:600;color:#EF4444;">${fmt(cobradoPrest)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:15px;font-weight:700;border-top:2px solid ${avexDebeNetoAPrest<0?'#EF4444':'var(--accent)'};margin-top:6px;">
+          <span style="color:${avexDebeNetoAPrest<0?'#EF4444':'var(--accent)'};">${avexDebeNetoAPrest>=0?'AVEX paga al prestador':'Prestador paga a AVEX'}</span>
+          <span style="font-size:22px;color:${avexDebeNetoAPrest<0?'#EF4444':'var(--accent)'};">${fmt(Math.abs(avexDebeNetoAPrest))}</span>
+        </div>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--muted);text-align:right;">IVA débito → AFIP: ${fmt(totalIva)} · Crédito fiscal prest.: ${fmt(ivaSobrePrest)}</div>
+    `;
+
+    return `<div class="liq-card" id="${id}">
+      <div class="liq-header" onclick="document.getElementById('${id}').classList.toggle('expanded')">
+        <div class="liq-avatar">${inicial}</div>
+        <div class="liq-info">
+          <div class="liq-nombre">${nombre}</div>
+          <div class="liq-meta">${vjs.length} viaje${vjs.length!==1?'s':''} · Facturado: ${fmt(totalFact)} · Rev. AVEX: ${fmt(totalRevAvex)}</div>
+        </div>
+        <div class="liq-saldo">
+          <div class="liq-saldo-label">${saldoLabel}</div>
+          <div class="liq-saldo-monto ${saldoClass}">${saldoMonto}</div>
+        </div>
+      </div>
+      <div class="liq-body">
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="${thStyle}color:var(--muted);">Fecha</th>
+              <th style="${thStyle}color:var(--muted);text-align:left;">Recorrido</th>
+              <th style="${thStyle}color:var(--muted);text-align:right;">Total</th>
+              <th style="${thStyle}color:#A78BFA;text-align:right;">IVA</th>
+              <th style="${thStyle}color:var(--muted);text-align:right;">Base</th>
+              <th style="${thStyle}color:var(--orange,#F59E0B);text-align:right;">Movida</th>
+              <th style="${thStyle}color:var(--accent);text-align:right;">Rev. Prest.</th>
+              <th style="${thStyle}color:var(--blue);text-align:right;">Rev. AVEX</th>
+              <th style="${thStyle}color:var(--muted);text-align:center;">Cobro</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+        </div>
+        ${resumenHTML}
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+          <button class="liq-print-btn" onclick="imprimirLiquidacion(this)">🖨️ Imprimir liquidación de ${nombre.split(' ')[0]}</button>
+          <button class="liq-print-btn" style="border-color:#22C55E;color:#22C55E;"
+            data-exp-nombre="${nombre.replace(/"/g,'&quot;')}"
+            data-exp-ids="${vjs.map(v=>v.id).join(',')}"
+            onclick="exportarLiquidacionPrestadorCSV(this)">
+            ⬇ Exportar CSV
+          </button>
+          <button class="liq-print-btn" style="border-color:var(--accent);color:var(--accent);"
+            data-liq-nombre="${nombre.replace(/"/g,'&quot;')}"
+            data-liq-ids="${vjs.map(v=>v.id).join(',')}"
+            data-liq-monto="${Math.abs(neto)}"
+            data-liq-tipo="${saldoClass}"
+            onclick="confirmarLiquidacionBtn(this)">
+            ✅ Marcar como liquidado · ${saldoMonto}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  renderLiquidacionesPasadas();
+}
+
+function exportarLiquidacionCSV(){
+  const desde=document.getElementById('liqDesde')?.value||'';
+  const hasta=document.getElementById('liqHasta')?.value||'';
+  const viajes=getHistorial().filter(v=>{
+    if(v.estado!=='completado')return false; if(v.liquidado)return false;
+    if(desde){if(new Date(v.createdAt)<new Date(desde))return false;}
+    if(hasta){const h=new Date(hasta);h.setHours(23,59,59);if(new Date(v.createdAt)>h)return false;}
+    return true;
+  });
+  if(!viajes.length){alert('No hay viajes completados para exportar.');return;}
+  const cols=['Prestador','Fecha','Origen','Destino','Total','Forma cobro','AVEX 40%','Prestador 60%','IVA','Acción','Monto a liquidar'];
+  const rows=viajes.map(v=>{
+    const esCash=v.formaCobro==='efectivo';
+    return [v.prestadorNombre,v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR'):'',v.origen,v.destino,v.total,v.formaCobro,v.montoAvex,v.montoPrestador,v.montoIva||0,esCash?'Cobrar a prestador':'Pagar al prestador',esCash?v.montoAvex:v.montoPrestador].map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',');
+  });
+  const csv=[cols.join(','),...rows].join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`avex-liquidaciones-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
+}
+
+// ── LIQUIDACIONES PASADAS (Supabase) ──────────────────────────
+let _liquidacionesCache = [];
+
+async function cargarLiquidacionesDesdeSupabase() {
+  const { data } = await sb.from('liquidaciones').select('*').order('created_at', { ascending: false });
+  _liquidacionesCache = (data || []).map(r => r.data);
+}
+
+function getLiquidacionesPasadas() { return _liquidacionesCache; }
+
+function exportarLiquidacionPrestadorCSV(btn) {
+  const nombre = btn.dataset.expNombre;
+  const ids    = btn.dataset.expIds.split(',').filter(Boolean);
+  const vjs    = getHistorial().filter(v => ids.includes(v.id));
+  if (!vjs.length) { alert('No se encontraron viajes.'); return; }
+
+  // Calcular totales para el resumen
+  const tFact  = vjs.reduce((a,v)=>a+(v.total||0),0);
+  const tIva   = vjs.reduce((a,v)=>a+(v.montoIva||0),0);
+  const tPrest = vjs.reduce((a,v)=>a+(v.montoPrestador||0),0);
+  const tMov   = vjs.reduce((a,v)=>a+(v.montoMovida||0),0);
+  const tAvex  = vjs.reduce((a,v)=>a+(v.montoAvex||0),0);
+  const tPrestCIva = (tPrest + tMov) * 1.21;
+  const cobradoPrest = vjs.filter(v=>v.formaCobro==='efectivo').reduce((a,v)=>a+(v.total||0),0);
+  const neto   = tPrestCIva - cobradoPrest;
+
+  const q = v => `"${String(v||'').replace(/"/g,'""')}"`;
+  const rows = [];
+
+  // Encabezado del documento
+  rows.push([q('AVEX · Liquidación de prestador'), q(nombre), '', '', '', '', '', '', '']);
+  rows.push([q('Fecha de emisión'), q(new Date().toLocaleDateString('es-AR')), '', '', '', '', '', '', '']);
+  rows.push(['','','','','','','','','']);
+
+  // Encabezados de columnas
+  rows.push(['Fecha','Recorrido','Total','IVA','Base','Movida','Rev. Prestador','Rev. AVEX','Forma de cobro'].map(q));
+
+  // Filas de viajes
+  vjs.forEach(v => {
+    const iva  = v.montoIva||0;
+    const base = (v.total||0) - iva;
+    rows.push([
+      v.createdAt ? new Date(v.createdAt).toLocaleDateString('es-AR') : '',
+      `${v.origen||''} → ${v.destino||''}`,
+      v.total||0,
+      iva||'',
+      base,
+      v.montoMovida||'',
+      v.montoPrestador||0,
+      v.montoAvex||0,
+      v.formaCobro==='efectivo'?'Efectivo':'Transferencia a AVEX',
+    ].map(q));
+  });
+
+  // Resumen
+  rows.push(['','','','','','','','','']);
+  rows.push([q('RESUMEN'),'','','','','','','','']);
+  rows.push([q('Total facturado'), q(tFact), '','','','','','','']);
+  rows.push([q('IVA débito → AFIP'), q(tIva), '','','','','','','']);
+  rows.push([q('Revenue AVEX (40%)'), q(tAvex), '','','','','','','']);
+  rows.push([q('Rev. prestador (60%)'), q(tPrest), '','','','','','','']);
+  rows.push([q('Movidas'), q(tMov), '','','','','','','']);
+  rows.push([q('Total c/IVA (60%+mov×1.21)'), q(tPrestCIva), '','','','','','','']);
+  rows.push([q('Cobrado por el prestador'), q(cobradoPrest), '','','','','','','']);
+  rows.push([q(neto>=0?'AVEX paga al prestador':'Prestador paga a AVEX'), q(Math.abs(neto)), '','','','','','','']);
+
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `avex-liquidacion-${nombre.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function confirmarLiquidacionBtn(btn){
+  const nombre=btn.dataset.liqNombre;
+  const viajeIds=btn.dataset.liqIds.split(',').filter(Boolean);
+  const montoNeto=parseFloat(btn.dataset.liqMonto);
+  const tipo=btn.dataset.liqTipo;
+  confirmarLiquidacion(nombre,viajeIds,montoNeto,tipo);
+}
+
+async function confirmarLiquidacion(prestador,viajeIds,montoNeto,tipo){
+  const accion=tipo==='pagar'?'AVEX paga al prestador':tipo==='cobrar'?'Prestador paga a AVEX':'Saldo neutro';
+  if(!confirm(`¿Confirmar liquidación de ${prestador}?\n${accion}: ${fmt(montoNeto)}\n\nEsto marcará ${viajeIds.length} viaje${viajeIds.length!==1?'s':''} como liquidados.`))return;
+  const hist=getHistorial();
+  const liqId='LQ'+Date.now().toString(36).toUpperCase();
+  const viajesLiquidados=[];
+  for (const v of hist) {
+    if(viajeIds.includes(v.id)){
+      v.liquidado=true; v.liquidadoId=liqId; v.liquidadoAt=Date.now();
+      viajesLiquidados.push(v);
+      await guardarEnHistorial(v);
+    }
+  }
+  const nuevaLiq = {id:liqId,prestador,fecha:Date.now(),viajes:viajesLiquidados,montoNeto,tipo,cantViajes:viajeIds.length,totalFacturado:viajesLiquidados.reduce((a,v)=>a+(v.total||0),0),cobrar:viajesLiquidados.filter(v=>v.formaCobro==='efectivo').reduce((a,v)=>a+(v.montoAvex||0),0),pagar:viajesLiquidados.filter(v=>v.formaCobro!=='efectivo').reduce((a,v)=>a+(v.montoPrestador||0),0)};
+  _liquidacionesCache.unshift(nuevaLiq);
+  await sb.from('liquidaciones').insert({ liq_id: liqId, data: nuevaLiq, created_at: new Date().toISOString() });
+  renderLiquidaciones(); renderLiquidacionesPasadas();
+}
+
+function renderLiquidacionesPasadas(){
+  const el=document.getElementById('liqPasadas'); if(!el)return;
+  const lqs=getLiquidacionesPasadas();
+  if(!lqs.length){el.innerHTML='';return;}
+  el.innerHTML=`<div style="margin-top:24px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+      <span>Liquidaciones cerradas (${lqs.length})</span>
+      <button onclick="borrarTodasLiquidaciones()" style="font-size:10px;background:none;border:none;color:var(--muted);cursor:pointer;" onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--muted)'">Borrar todo</button>
+    </div>
+    ${lqs.map((lq,idx)=>{
+      const fecha=new Date(lq.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const accion=lq.tipo==='pagar'?'✅ AVEX pagó al prestador':lq.tipo==='cobrar'?'✅ Prestador pagó a AVEX':'✅ Saldo neutro';
+      const cardId=`lqp_${idx}`;
+      const detalleViajes=(lq.viajes||[]).map(v=>{
+        const fv=v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}):'—';
+        const esCash=v.formaCobro==='efectivo';
+        return `<div class="liq-row" style="grid-template-columns:80px 1fr 100px 120px 110px;">
+          <span>${fv}</span>
+          <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(v.origen||'').split(',')[0]} → ${(v.destino||'').split(',')[0]}</span>
+          <span style="font-weight:600;">${fmt(v.total)}</span>
+          <span><span class="liq-cobro-pill ${v.formaCobro||''}">${esCash?'💵 Efectivo':'🏦 Transf.'}</span></span>
+          <span style="font-weight:600;color:${esCash?'#EF4444':'var(--accent)'};">${fmt(esCash?v.montoAvex:v.montoPrestador)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="liq-card" id="${cardId}">
+        <div class="liq-header" onclick="document.getElementById('${cardId}').classList.toggle('expanded')">
+          <div class="liq-avatar" style="background:var(--surface2);border-color:var(--border);color:var(--muted);">✅</div>
+          <div class="liq-info">
+            <div class="liq-nombre">${lq.prestador}</div>
+            <div class="liq-meta">${lq.cantViajes} viaje${lq.cantViajes!==1?'s':''} · ${fecha} · ID: ${lq.id}</div>
+          </div>
+          <div class="liq-saldo">
+            <div class="liq-saldo-label">${accion}</div>
+            <div class="liq-saldo-monto" style="color:var(--accent);">${fmt(lq.montoNeto)}</div>
+          </div>
+        </div>
+        <div class="liq-body">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+            <div><div class="liq-res-label">Total facturado</div><div class="liq-res-value">${fmt(lq.totalFacturado)}</div></div>
+            <div><div class="liq-res-label">AVEX cobró</div><div class="liq-res-value" style="color:#EF4444;">${fmt(lq.cobrar||0)}</div></div>
+            <div><div class="liq-res-label">AVEX pagó</div><div class="liq-res-value" style="color:var(--accent);">${fmt(lq.pagar||0)}</div></div>
+            <div><div class="liq-res-label">Saldo neto</div><div class="liq-res-value" style="color:var(--accent);">${fmt(lq.montoNeto)}</div></div>
+          </div>
+          ${lq.viajes?.length?`
+            <div class="liq-thead" style="grid-template-columns:80px 1fr 100px 120px 110px;">
+              <span>Fecha</span><span>Recorrido</span><span>Total</span><span>Forma cobro</span><span>Liquidado</span>
+            </div>
+            ${detalleViajes}`:'<p style="font-size:12px;color:var(--muted);">Sin detalle.</p>'}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function borrarTodasLiquidaciones(){
+  if(!confirm('¿Borrar todo el registro de liquidaciones cerradas?'))return;
+  _liquidacionesCache = [];
+  await sb.from('liquidaciones').delete().neq('liq_id','_');
+  renderLiquidacionesPasadas();
+}
+
+// ── BRAND HEADER (imprimibles) ────────────────────────────────
+function brandHeader(titulo,subtitulo,meta){
+  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;padding-bottom:18px;border-bottom:3px solid #22C55E;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <img src="https://avexargentina.com/logo_avex.png" alt="AVEX" style="height:32px;" onerror="this.style.display='none'">
+      <div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#22C55E;margin-bottom:2px;">Asistencia vehicular express</div>
+        <div style="font-size:16px;font-weight:700;color:#111;">${titulo}</div>
+        ${subtitulo?`<div style="font-size:11px;color:#666;margin-top:1px;">${subtitulo}</div>`:''}
+      </div>
+    </div>
+    <div style="text-align:right;font-size:11px;color:#666;line-height:1.8;">${meta}<div style="margin-top:2px;font-size:10px;color:#aaa;">avexargentina.com · +54 9 11 6829-4554</div></div>
+  </div>`;
+}
+function brandFooter(){
+  return `<div style="margin-top:24px;padding-top:14px;border-top:1px solid #e8e8e8;font-size:10px;color:#aaa;text-align:center;line-height:1.8;"><strong style="color:#22C55E;">AVEX</strong> · Asistencia vehicular express · CABA, Zona Norte, Zona Sur y La Plata<br>WhatsApp: +54 9 11 6829-4554 · avexargentina.com</div>`;
+}
+
+// ── FOTOS ─────────────────────────────────────────────────────
+function subirFoto(input,tipo){
+  const file=input.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const MAX=800; let w=img.width,h=img.height;
+      if(w>MAX){h=Math.round(h*MAX/w);w=MAX;} if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const b64=canvas.toDataURL('image/jpeg',.7);
+      if(tipo==='origen')pViaje.fotoOrigen=b64; else pViaje.fotoDestino=b64;
+      pGuardar(); guardarEnHistorial(pViaje); pRender();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function verFoto(src){document.getElementById('fotoModalImg').src=src;document.getElementById('fotoModal').classList.add('open');}
+function cerrarFotoModal(){document.getElementById('fotoModal').classList.remove('open');}
+
+// ── NAVEGACIÓN ────────────────────────────────────────────────
+function abrirNavegacion(app,destEnc){
+  const dest=decodeURIComponent(destEnc);
+  if(app==='gmaps') window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=driving`);
+  else window.open(`https://waze.com/ul?q=${encodeURIComponent(dest)}&navigate=yes`);
+}
+
+// ── MODALES COMPROBANTE Y LIQUIDACIÓN ─────────────────────────
+let _viajeComprobante=null;
+function cerrarCompModal(){document.getElementById('modalCompOverlay').style.display='none';document.body.style.overflow='';}
+function cerrarLiqModal(){document.getElementById('modalLiqOverlay').style.display='none';document.body.style.overflow='';}
+
+function abrirComprobanteModal(){
+  const v=_viajeComprobante; if(!v)return;
+  const dur=v.timestamps?.completado&&v.timestamps?.['en-camino']?Math.round((v.timestamps.completado-v.timestamps['en-camino'])/60000)+' min':'—';
+  const fecha=new Date(v.timestamps?.completado||Date.now()).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const row=(label,value,style='')=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;"><span style="color:#666;">${label}</span><span style="font-weight:600;${style}">${value}</span></div>`;
+  document.getElementById('compPrintArea').innerHTML=`
+    ${brandHeader('Comprobante de viaje','Servicio completado',`<div><strong>ID</strong> ${v.id}</div><div><strong>Fecha</strong> ${fecha}</div>`)}
+    ${row('Prestador',v.prestadorNombre||'—')}
+    ${row('Cliente',v.cliente||'—')}
+    ${row('Vehículo',(v.vehiculoCliente||'—')+' · '+(v.patenteCliente||'—'))}
+    ${row('Recorrido',v.origen+' → '+v.destino)}
+    ${row('Distancia',v.km+' km')}
+    ${row('Duración',dur)}
+    ${row('Total cobrado',fmt(v.total),'font-size:15px;')}
+    ${row('Parte prestador (60%)',fmt(v.montoPrestador),'color:#22C55E;')}
+    ${row('Parte AVEX (40%)',fmt(v.montoAvex),'color:#3B82F6;')}
+    ${row('Forma de cobro',v.formaCobro==='efectivo'?'💵 Efectivo':'🏦 Transferencia a AVEX')}
+    ${row('Zona',v.zona||'—')}
+    ${brandFooter()}`;
+  document.getElementById('modalCompOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+
+function imprimirLiquidacion(btn){
+  const body=btn.closest('.liq-body');
+  const card=btn.closest('.liq-card');
+  const nombre=card.querySelector('.liq-nombre')?.textContent||'';
+  const meta=card.querySelector('.liq-meta')?.textContent||'';
+  const saldoLabel=card.querySelector('.liq-saldo-label')?.textContent||'';
+  const saldoMonto=card.querySelector('.liq-saldo-monto')?.textContent||'';
+  const saldoClass=card.querySelector('.liq-saldo-monto')?.className||'';
+  const color=saldoClass.includes('pagar')?'#22C55E':saldoClass.includes('cobrar')?'#EF4444':'#888';
+  const fecha=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const filas=[...body.querySelectorAll('.liq-row')].map(r=>r.outerHTML).join('');
+  const resItems=[...body.querySelectorAll('.liq-res-item')].map(el=>{
+    const lbl=el.querySelector('.liq-res-label')?.textContent||'';
+    const val=el.querySelector('.liq-res-value')?.textContent||'';
+    const style=el.querySelector('.liq-res-value')?.getAttribute('style')||'';
+    return `<div style="flex:1;min-width:110px;background:#f8f8f8;border:1px solid #e8e8e8;border-radius:6px;padding:10px 14px;"><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#888;margin-bottom:4px;">${lbl}</div><div style="font-size:15px;font-weight:700;${style}">${val}</div></div>`;
+  }).join('');
+  document.getElementById('liqPrintArea').innerHTML=`
+    ${brandHeader('Liquidación de prestador',nombre,`<div><strong>Fecha</strong> ${fecha}</div><div>${meta}</div>`)}
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:600;color:#166534;">${saldoLabel}</div>
+      <div style="font-size:22px;font-weight:700;color:${color};">${saldoMonto}</div>
+    </div>
+    <div style="border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+      <div style="display:grid;grid-template-columns:80px 1fr 100px 120px 110px 130px;padding:8px 12px;background:#f8f8f8;border-bottom:1px solid #e8e8e8;">
+        ${['Fecha','Recorrido','Total','Forma cobro','A liquidar','Acción'].map(h=>`<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#888;">${h}</span>`).join('')}
+      </div>
+      <div style="padding:0 12px;">${filas}</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">${resItems}</div>
+    ${brandFooter()}`;
+  document.getElementById('modalLiqOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+let _dashFact = null, _dashViajes = null;
+
+function setDashPeriod(p){
+  const hoy=new Date(), pad=n=>String(n).padStart(2,'0');
+  const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const el1=document.getElementById('dashDesde'), el2=document.getElementById('dashHasta');
+  el2.value=iso(hoy);
+  if(p==='mes') el1.value=iso(new Date(hoy.getFullYear(),hoy.getMonth(),1));
+  else if(p==='7d'){const d=new Date(hoy);d.setDate(hoy.getDate()-6);el1.value=iso(d);}
+  else{el1.value='';el2.value='';}
+  renderDashboard();
+}
+
+function renderDashboard(){
+  const desde=document.getElementById('dashDesde')?.value||'';
+  const hasta=document.getElementById('dashHasta')?.value||'';
+  const vs=getHistorial().filter(v=>{
+    if(v.estado!=='completado')return false;
+    if(desde&&new Date(v.createdAt)<new Date(desde))return false;
+    if(hasta){const h=new Date(hasta);h.setHours(23,59,59);if(new Date(v.createdAt)>h)return false;}
+    return true;
+  });
+  const sum=(f)=>vs.reduce((a,v)=>a+(f(v)||0),0);
+  const tFact=sum(v=>v.total), tIva=sum(v=>v.montoIva), tAvex=sum(v=>v.montoAvex);
+  const tPrest=sum(v=>v.montoPrestador), tMov=sum(v=>v.montoMovida), tKm=sum(v=>parseFloat(v.km||0));
+  const ticket=vs.length?tFact/vs.length:0, kmProm=vs.length?tKm/vs.length:0;
+  const ef=vs.filter(v=>v.formaCobro==='efectivo').length, tr=vs.filter(v=>v.formaCobro==='transferencia').length;
+
+  const kR=document.getElementById('dashKpiRevenue');
+  if(kR)kR.innerHTML=[
+    {l:'Total facturado',v:fmt(tFact),c:'var(--text)',s:vs.length+' viajes'},
+    {l:'Revenue AVEX (40%)',v:fmt(tAvex),c:'var(--blue)',s:'sin IVA'},
+    {l:'IVA débito → AFIP',v:fmt(tIva),c:'#A78BFA',s:'factura A'},
+    {l:'A prestadores (60%)',v:fmt(tPrest),c:'var(--accent)',s:'sin IVA'},
+    {l:'Movidas',v:fmt(tMov),c:'var(--orange,#F59E0B)',s:'costo AVEX'},
+    {l:'Ticket promedio',v:fmt(ticket),c:'var(--text)',s:'por viaje'},
+  ].map(k=>`<div class="hist-stat"><div class="hist-stat-label">${k.l}</div><div class="hist-stat-value" style="color:${k.c};">${k.v}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">${k.s}</div></div>`).join('');
+
+  const kO=document.getElementById('dashKpiOps');
+  if(kO)kO.innerHTML=[
+    {l:'Viajes completados',v:vs.length,c:'var(--accent)'},
+    {l:'Cobró prestador',v:ef+' viajes',c:'var(--text)'},
+    {l:'Cobró AVEX',v:tr+' viajes',c:'var(--text)'},
+    {l:'Km recorridos',v:Math.round(tKm)+' km',c:'var(--muted)'},
+    {l:'Distancia promedio',v:kmProm.toFixed(1)+' km',c:'var(--muted)'},
+  ].map(k=>`<div class="hist-stat"><div class="hist-stat-label">${k.l}</div><div class="hist-stat-value" style="color:${k.c};">${k.v}</div></div>`).join('');
+
+  const isLight=document.body.classList.contains('light');
+  const gc=isLight?'rgba(0,0,0,.06)':'rgba(255,255,255,.05)', tc=isLight?'#666':'#888';
+
+  const porDia={};
+  vs.forEach(v=>{
+    const d=new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
+    if(!porDia[d])porDia[d]={f:0,a:0,p:0,n:0};
+    porDia[d].f+=(v.total||0);porDia[d].a+=(v.montoAvex||0);porDia[d].p+=(v.montoPrestador||0);porDia[d].n++;
+  });
+  const dias=Object.keys(porDia).slice(-30);
+
+  const cF=document.getElementById('dashChartFact');
+  if(cF){
+    if(_dashFact)_dashFact.destroy();
+    _dashFact=new Chart(cF,{type:'bar',data:{labels:dias,datasets:[
+      {label:'Facturado (k$)',data:dias.map(d=>Math.round(porDia[d].f/1000)),backgroundColor:'rgba(34,197,94,.2)',borderColor:'#22C55E',borderWidth:2,borderRadius:4},
+      {label:'Rev. AVEX (k$)',data:dias.map(d=>Math.round(porDia[d].a/1000)),backgroundColor:'rgba(79,142,247,.2)',borderColor:'#4F8EF7',borderWidth:2,borderRadius:4},
+      {label:'Rev. Prest. (k$)',data:dias.map(d=>Math.round(porDia[d].p/1000)),backgroundColor:'rgba(251,176,36,.15)',borderColor:'#FBB024',borderWidth:2,borderRadius:4},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:11}}}},scales:{x:{ticks:{color:tc,font:{size:10}},grid:{color:gc}},y:{ticks:{color:tc,callback:v=>'$'+v+'k'},grid:{color:gc}}}}});
+  }
+
+  const cV=document.getElementById('dashChartViajes');
+  if(cV){
+    if(_dashViajes)_dashViajes.destroy();
+    _dashViajes=new Chart(cV,{type:'line',data:{labels:dias,datasets:[
+      {label:'Viajes',data:dias.map(d=>porDia[d].n),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,.1)',borderWidth:2,fill:true,tension:.4,pointRadius:3,pointBackgroundColor:'#22C55E'},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:11}}}},scales:{x:{ticks:{color:tc,font:{size:10}},grid:{color:gc}},y:{ticks:{color:tc,stepSize:1},grid:{color:gc},beginAtZero:true}}}});
+  }
+
+  // Tabla por prestador
+  const pp={};
+  vs.forEach(v=>{
+    const n=v.prestadorNombre||'Sin nombre';
+    if(!pp[n])pp[n]={n:0,f:0,a:0,p:0,m:0,k:0};
+    pp[n].n++;pp[n].f+=(v.total||0);pp[n].a+=(v.montoAvex||0);pp[n].p+=(v.montoPrestador||0);pp[n].m+=(v.montoMovida||0);pp[n].k+=parseFloat(v.km||0);
+  });
+  const tp=document.getElementById('dashTablePrest');
+  if(tp)tp.innerHTML=!Object.keys(pp).length?'<p style="font-size:12px;color:var(--muted);">Sin datos.</p>':`
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="border-bottom:2px solid var(--border);">
+      ${['Prestador','Viajes','Facturado','Rev. Prest.','Movida','Rev. AVEX','Km'].map(h=>`<th style="padding:6px 8px;text-align:${h==='Prestador'?'left':'right'};font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">${h}</th>`).join('')}
+    </tr></thead>
+    <tbody>${Object.entries(pp).sort((a,b)=>b[1].f-a[1].f).map(([n,d])=>`
+      <tr style="border-bottom:1px solid #1a1a1a;">
+        <td style="padding:7px 8px;font-weight:600;">${n}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--accent);font-weight:700;">${d.n}</td>
+        <td style="padding:7px 8px;text-align:right;font-weight:600;">${fmt(d.f)}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--accent);">${fmt(d.p)}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--orange,#F59E0B);">${d.m>0?fmt(d.m):'—'}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--blue);">${fmt(d.a)}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--muted);">${d.k.toFixed(1)}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+
+  // Tabla por zona
+  const pz={};
+  vs.forEach(v=>{
+    const z=v.zona||'Sin zona';
+    if(!pz[z])pz[z]={n:0,f:0,a:0};
+    pz[z].n++;pz[z].f+=(v.total||0);pz[z].a+=(v.montoAvex||0);
+  });
+  const tz=document.getElementById('dashTableZona');
+  if(tz)tz.innerHTML=!Object.keys(pz).length?'<p style="font-size:12px;color:var(--muted);">Sin datos.</p>':`
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="border-bottom:2px solid var(--border);">
+      ${['Zona','Viajes','Facturado','Rev. AVEX'].map(h=>`<th style="padding:6px 8px;text-align:${h==='Zona'?'left':'right'};font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">${h}</th>`).join('')}
+    </tr></thead>
+    <tbody>${Object.entries(pz).sort((a,b)=>b[1].n-a[1].n).map(([z,d])=>`
+      <tr style="border-bottom:1px solid #1a1a1a;">
+        <td style="padding:7px 8px;font-weight:600;">${z}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--accent);font-weight:700;">${d.n}</td>
+        <td style="padding:7px 8px;text-align:right;font-weight:600;">${fmt(d.f)}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--blue);">${fmt(d.a)}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+// ── SUPABASE CONFIG ───────────────────────────────────────────
+// ⚠️ REEMPLAZÁ ESTOS VALORES con los de tu proyecto Supabase
+const SUPABASE_URL = 'TU_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── ROLES (mapeo email → rol) ─────────────────────────────────
+// Agregá acá los emails de cada usuario y su rol
+const ROLES_EMAIL = {
+  'admin@avex.com':  { nombre:'Admin', paginas:['pageCalc','pageHistorial','pageDashboard','pageLiquidaciones','pageTarifario'] },
+  'nico@avex.com':   { nombre:'Nico',  paginas:['pageCalc','pageHistorial'] },
+  'jose@avex.com':   { nombre:'José',  paginas:['pageCalc','pageHistorial'] },
+  'agus@avex.com':   { nombre:'Agus',  paginas:['pageCalc','pageHistorial'] },
+};
+let rolActual = null;
+
+async function checkLogin() {
+  const email = document.getElementById('loginInput').value.trim();
+  const pass  = document.getElementById('loginPass') ? document.getElementById('loginPass').value : '';
+  const errEl = document.getElementById('loginError');
+  const btn   = document.querySelector('.login-btn');
+  if (!email || !pass) { errEl.textContent='Completá email y contraseña.'; errEl.classList.add('visible'); return; }
+  btn.textContent = 'Ingresando...'; btn.disabled = true;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.textContent = 'Ingresar →'; btn.disabled = false;
+  if (error) {
+    errEl.textContent = 'Email o contraseña incorrectos.';
+    errEl.classList.add('visible');
+    document.getElementById('loginInput').focus();
+    return;
+  }
+  const rol = ROLES_EMAIL[email] || { nombre: email.split('@')[0], paginas:['pageCalc','pageHistorial'] };
+  rolActual = email;
+  document.getElementById('loginScreen').classList.add('hidden');
+  aplicarRol(rol);
+  cargarHistorialDesdeSupabase();
+}
+
+function aplicarRol(rol) {
+  const tabs = {
+    pageCalc:          document.querySelector('.nav-tab[onclick*="pageCalc"]'),
+    pageHistorial:     document.querySelector('.nav-tab[onclick*="pageHistorial"]'),
+    pageDashboard:     document.querySelector('.nav-tab[onclick*="pageDashboard"]'),
+    pageLiquidaciones: document.querySelector('.nav-tab[onclick*="pageLiquidaciones"]'),
+    pageTarifario:     document.querySelector('.nav-tab[onclick*="pageTarifario"]'),
+  };
+  Object.entries(tabs).forEach(([page, el]) => {
+    if (!el) return;
+    el.style.display = rol.paginas.includes(page) ? '' : 'none';
+  });
+  const tag = document.getElementById('userTag');
+  if (tag) tag.textContent = rol.nombre;
+}
+
+async function logout() {
+  if (!confirm('¿Cerrar sesión?')) return;
+  await sb.auth.signOut();
+  rolActual = null;
+  document.getElementById('loginInput').value = '';
+  document.getElementById('loginError').classList.remove('visible');
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+// ── MODO PRESTADOR INIT ───────────────────────────────────────
+let pViaje = null, pCobroSel = null, pMapObj = null;
+const P_SIG = { pendiente:'en-camino', 'en-camino':'en-origen', 'en-origen':'en-destino' };
+
+async function pGuardar() {
+  await guardarViajeActivo(pViaje);
+}
+
+async function pAccion() {
+  const sig = P_SIG[pViaje.estado]; if (!sig) return;
+  pViaje.estado = sig;
+  pViaje.timestamps = pViaje.timestamps || {};
+  pViaje.timestamps[sig] = Date.now();
+  pCobroSel = null;
+  await pGuardar(); pRender();
+}
+
+function pSelCobro(tipo) { pCobroSel = tipo; pViaje.estado = 'cobro'; pRender(); }
+
+async function pConfirmarCobro() {
+  if (!pCobroSel) return;
+  pViaje.estado = 'completado';
+  pViaje.formaCobro = pCobroSel;
+  pViaje.timestamps = pViaje.timestamps || {};
+  pViaje.timestamps.completado = Date.now();
+  await pGuardar(); await guardarEnHistorial(pViaje); pRender();
+}
+
+function pRender() {
+  const v = pViaje; if (!v) return;
+  const PASOS = ['pendiente','en-camino','en-origen','en-destino','completado'];
+  const LABELS = { pendiente:'Pendiente', 'en-camino':'En camino', 'en-origen':'En origen', 'en-destino':'En destino', cobro:'En destino', completado:'Completado' };
+  const estadoReal = v.estado === 'cobro' ? 'en-destino' : v.estado;
+
+  // Badge
+  const badge = document.getElementById('pBadge');
+  if (badge) { badge.textContent = LABELS[v.estado] || v.estado; badge.className = 'p-badge ' + v.estado; }
+
+  // Timeline — solo los pasos principales, sin cobro
+  const idxActual = PASOS.indexOf(estadoReal);
+  const tlHtml = PASOS.map((s, i) => {
+    const done = i < idxActual || v.estado === 'completado';
+    const act  = i === idxActual && v.estado !== 'completado';
+    const ts   = v.timestamps?.[s] ? new Date(v.timestamps[s]).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
+    return `<div class="p-tl-step${done?' done':''}${act?' active':''}">
+      <div class="p-tl-dot">${done?'✓':''}</div>
+      <div class="p-tl-body">
+        <div class="p-tl-label">${LABELS[s]}</div>
+        ${ts?`<div class="p-tl-time">${ts}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Navegación
+  const navOrigen = (v.estado === 'pendiente' || v.estado === 'en-camino') ? `
+    <div class="p-card" style="padding:14px 16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">🧭 Navegar al origen</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:12px;">${v.origen}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent('${v.origen}')+'&travelmode=driving')" style="padding:10px;border:none;border-radius:6px;background:#4285F4;color:#fff;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Google Maps</button>
+        <button onclick="window.open('https://waze.com/ul?q='+encodeURIComponent('${v.origen}')+'&navigate=yes')" style="padding:10px;border:none;border-radius:6px;background:#33CCFF;color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Waze</button>
+      </div>
+    </div>` : '';
+
+  // Fotos — solo cuando está en origen o después
+  const mostrarFotos = ['en-origen','en-destino','cobro','completado'].includes(v.estado);
+  const fotoOrigenTaken = !!v.fotoOrigen;
+  const fotoDestinoTaken = !!v.fotoDestino;
+  const fotosHtml = mostrarFotos ? `
+    <div class="p-card" style="padding:14px 16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">📸 Evidencia fotográfica</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div onclick="document.getElementById('inputFotoO').click()" style="border:2px ${fotoOrigenTaken?'solid var(--accent)':'dashed var(--border)'};border-radius:8px;padding:14px;text-align:center;cursor:pointer;">
+          <input type="file" id="inputFotoO" accept="image/*" capture="environment" style="display:none" onchange="subirFoto(this,'origen')">
+          <div style="font-size:22px;margin-bottom:6px;">${fotoOrigenTaken?'✅':'📷'}</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);">Al llegar al origen</div>
+          <div style="font-size:10px;color:${fotoOrigenTaken?'var(--accent)':'var(--muted)'};margin-top:3px;">${fotoOrigenTaken?'✓ Tomada':'Tocar para sacar'}</div>
+          ${fotoOrigenTaken?`<img src="${v.fotoOrigen}" style="width:100%;border-radius:4px;margin-top:8px;max-height:80px;object-fit:cover;">` : ''}
+        </div>
+        <div onclick="document.getElementById('inputFotoD').click()" style="border:2px ${fotoDestinoTaken?'solid var(--accent)':'dashed var(--border)'};border-radius:8px;padding:14px;text-align:center;cursor:pointer;">
+          <input type="file" id="inputFotoD" accept="image/*" capture="environment" style="display:none" onchange="subirFoto(this,'destino')">
+          <div style="font-size:22px;margin-bottom:6px;">${fotoDestinoTaken?'✅':'📷'}</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);">Al llegar al destino</div>
+          <div style="font-size:10px;color:${fotoDestinoTaken?'var(--accent)':'var(--muted)'};margin-top:3px;">${fotoDestinoTaken?'✓ Tomada':'Tocar para sacar'}</div>
+          ${fotoDestinoTaken?`<img src="${v.fotoDestino}" style="width:100%;border-radius:4px;margin-top:8px;max-height:80px;object-fit:cover;">` : ''}
+        </div>
+      </div>
+    </div>` : '';
+
+  // Cobro
+  const cobroHtml = (v.estado === 'cobro' || v.estado === 'en-destino') ? `
+    <div class="p-cobro-card">
+      <div class="p-cobro-title">¿Cómo se cobró el servicio?</div>
+      <div class="p-cobro-sub">Seleccioná la forma de cobro para cerrar el viaje</div>
+      <div class="p-cobro-opts">
+        <div class="p-cobro-opt${pCobroSel==='efectivo'?' selected':''}" onclick="pSelCobro('efectivo')">
+          <div class="p-cobro-opt-icon">💵</div>
+          <div class="p-cobro-opt-label">Cobré en efectivo</div>
+          <div class="p-cobro-opt-desc">El cliente me pagó cash</div>
+        </div>
+        <div class="p-cobro-opt${pCobroSel==='transferencia'?' selected':''}" onclick="pSelCobro('transferencia')">
+          <div class="p-cobro-opt-icon">🏦</div>
+          <div class="p-cobro-opt-label">Transfirió a AVEX</div>
+          <div class="p-cobro-opt-desc">El pago fue a AVEX</div>
+        </div>
+      </div>
+      <button class="p-btn-confirmar" style="display:${pCobroSel?'block':'none'};" onclick="pConfirmarCobro()">✅ Confirmar y cerrar viaje</button>
+    </div>` : '';
+
+  // Completado
+  const doneHtml = v.estado === 'completado' ? `
+    <div class="p-card" style="text-align:center;padding:32px 20px;">
+      <div style="font-size:48px;margin-bottom:12px;">✅</div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;">Viaje completado</div>
+      <div style="font-size:13px;color:var(--muted);">${v.formaCobro === 'efectivo' ? '💵 Cobrado en efectivo' : '🏦 Transferencia a AVEX'}</div>
+    </div>` : '';
+
+  document.getElementById('pContent').innerHTML = `
+    <div class="p-card">
+      <div class="p-card-title">Datos del viaje</div>
+      <div class="p-row"><span class="p-row-icon">🟢</span><div><div class="p-row-label">Origen</div><div class="p-row-value">${v.origen}</div></div></div>
+      <div class="p-row"><span class="p-row-icon">🔴</span><div><div class="p-row-label">Destino</div><div class="p-row-value">${v.destino}</div></div></div>
+      <div class="p-row"><span class="p-row-icon">📏</span><div><div class="p-row-label">Recorrido</div><div class="p-row-value">${v.km} km · ${v.tiempo}</div></div></div>
+      <div class="p-row"><span class="p-row-icon">👤</span><div><div class="p-row-label">Cliente</div><div class="p-row-value">${v.cliente||'—'}</div><div class="p-row-sub">${v.clienteTel||''}</div></div></div>
+      <div class="p-row"><span class="p-row-icon">🚘</span><div><div class="p-row-label">Vehículo</div><div class="p-row-value">${v.vehiculoCliente||'—'} · ${v.patenteCliente||'—'}</div></div></div>
+    </div>
+    ${navOrigen}
+    <div class="p-card" style="overflow:hidden;"><div id="p-map" style="height:200px;"></div></div>
+    <div class="p-total">
+      <div><div class="p-total-label">Total del servicio</div><div><span class="p-total-price">${fmt(v.total)}</span><span class="p-total-cur">ARS</span></div></div>
+      <div class="p-total-right"><div>Tu parte</div><div class="p-total-parte">${fmt(v.montoPrestador)}</div><div>Factura ${v.factura||'C'}</div></div>
+    </div>
+    <div class="p-card"><div class="p-card-title">Estado del viaje</div><div class="p-tl">${tlHtml}</div></div>
+    ${fotosHtml}
+    ${cobroHtml}
+    ${doneHtml}
+  `;
+
+  // Mapa
+  if (pMapObj) { pMapObj.remove(); pMapObj = null; }
+  if (v.oLat && v.oLon) {
+    pMapObj = L.map('p-map').setView([v.oLat, v.oLon], 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {attribution:'© OpenStreetMap © CARTO', maxZoom:19}).addTo(pMapObj);
+    const mkP = (lbl,col) => L.divIcon({className:'', html:`<div style="background:${col};color:#000;font-family:Inter,sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;white-space:nowrap;">${lbl}</div>`, iconAnchor:[0,0]});
+    L.marker([v.oLat,v.oLon],{icon:mkP('A · Origen','#22C55E')}).addTo(pMapObj);
+    L.marker([v.dLat,v.dLon],{icon:mkP('B · Destino','#F59E0B')}).addTo(pMapObj);
+    if (v.routeCoords?.length){const poly=L.polyline(v.routeCoords,{color:'#22C55E',weight:3,opacity:.8}).addTo(pMapObj);pMapObj.fitBounds(poly.getBounds(),{padding:[30,30]});}
+  }
+
+  // Botón de acción fijo abajo
+  const nav = document.getElementById('pNav');
+  const btn = document.getElementById('pBtnAccion');
+  // Mostrar botón solo en estados que avanzan (no en en-destino ni cobro porque el cobro es inline)
+  const cfgBtn = {
+    pendiente:   {cls:'iniciar', icon:'🚗', txt:'Iniciar viaje al origen'},
+    'en-camino': {cls:'origen',  icon:'📍', txt:'Llegué al origen'},
+    'en-origen': {cls:'destino', icon:'🏁', txt:'Llegué al destino'},
+  };
+  const cfg = cfgBtn[v.estado];
+  if (cfg) {
+    nav.style.display = 'block';
+    btn.className = `p-btn-accion ${cfg.cls}`;
+    document.getElementById('pBtnIcon').textContent = cfg.icon;
+    document.getElementById('pBtnTxt').textContent  = cfg.txt;
+  } else {
+    nav.style.display = 'none';
+  }
+}
+
+async function initModoPrestador() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const data   = params.get('data');
+    if (!data) return false;
+    const v = JSON.parse(decodeURIComponent(escape(atob(data))));
+    if (!v || !v.id) return false;
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('modoAvex').style.display = 'none';
+    document.getElementById('modoPrestador').classList.add('active');
+    document.title = 'AVEX · Viaje del Prestador';
+    // Intentar cargar versión más reciente desde Supabase
+    const { data: row } = await sb.from('viajes_activos').select('data').eq('viaje_id', v.id).single();
+    pViaje = (row && row.data) ? row.data : v;
+    _viajesActivosCache[pViaje.id] = pViaje;
+    // Si no existe en Supabase, guardar el del link
+    if (!row) await guardarViajeActivo(pViaje);
+    pRender();
+    // Polling cada 3s desde Supabase
+    setInterval(async () => {
+      const { data: fresh } = await sb.from('viajes_activos').select('data').eq('viaje_id', pViaje.id).single();
+      if (fresh && fresh.data && fresh.data.estado !== pViaje.estado) {
+        pViaje = fresh.data;
+        _viajesActivosCache[pViaje.id] = pViaje;
+        pRender();
+      }
+    }, 3000);
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+// Reset tarifas si no coincide con la versión actual
+const TARIFA_VERSION = 'v6';
+if (localStorage.getItem('avex-tarifa-ver') !== TARIFA_VERSION) {
+  localStorage.removeItem('avex-tarifas');
+  localStorage.setItem('avex-tarifa-ver', TARIFA_VERSION);
+}
+
+// Inicialización async: Supabase auth primero
+async function init() {
+  // Ver si es modo prestador (link con ?data=)
+  const esPrestador = await initModoPrestador();
+  if (esPrestador) return;
+
+  // Verificar sesión activa en Supabase
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    const email = session.user.email;
+    rolActual = email;
+    const rol = ROLES_EMAIL[email] || { nombre: email.split('@')[0], paginas:['pageCalc','pageHistorial'] };
+    document.getElementById('loginScreen').classList.add('hidden');
+    aplicarRol(rol);
+    await cargarHistorialDesdeSupabase();
+    await cargarLiquidacionesDesdeSupabase();
+  } else {
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
+  if(localStorage.getItem('avex-theme')==='light') toggleTheme();
+  renderZonaPills();
+  actualizarContadorHistorial();
+  setInterval(()=>{ if(viajeActivoId) actualizarMonitor(viajeActivoId); }, 3000);
+}
+
+init();
+</script>
+</body>
+</html>
