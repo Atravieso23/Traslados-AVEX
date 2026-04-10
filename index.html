@@ -1720,6 +1720,18 @@ function renderHistorial(){
           <button class="hist-btn" onclick="reenviarLink('${v.id}')">📤 Reenviar link</button>
           <button class="hist-btn" onclick="corregirViaje('${v.id}')" style="border-color:var(--blue);color:var(--blue);">✏️ Corregir</button>
           <button class="hist-btn danger" onclick="eliminarViaje('${v.id}')">🗑 Eliminar</button>
+          ${rolActual === 'admin@avex.com' ? `
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+            <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">Estado:</span>
+            <select onchange="cambiarEstadoAdmin('${v.id}', this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px;padding:6px 10px;border-radius:6px;outline:none;cursor:pointer;">
+              <option value="pendiente"     ${v.estado==='pendiente'     ?'selected':''}>Pendiente</option>
+              <option value="en-camino"     ${v.estado==='en-camino'     ?'selected':''}>En camino</option>
+              <option value="en-origen"     ${v.estado==='en-origen'     ?'selected':''}>En origen</option>
+              <option value="en-destino"    ${v.estado==='en-destino'    ?'selected':''}>En destino</option>
+              <option value="cobro"         ${v.estado==='cobro'         ?'selected':''}>Cobro</option>
+              <option value="completado"    ${v.estado==='completado'    ?'selected':''}>Completado</option>
+            </select>
+          </div>` : ''}
         </div>
         ${(v.fotoOrigen||v.fotoDestino)?`
         <div style="margin-top:10px;">
@@ -1732,6 +1744,16 @@ function renderHistorial(){
       </div>
     </div>`;
   }).join('');
+}
+
+async function cambiarEstadoAdmin(viajeId, nuevoEstado) {
+  const idx = _historialCache.findIndex(v => v.id === viajeId);
+  if (idx < 0) return;
+  _historialCache[idx].estado = nuevoEstado;
+  if (!_historialCache[idx].timestamps) _historialCache[idx].timestamps = {};
+  _historialCache[idx].timestamps[nuevoEstado] = Date.now();
+  await guardarEnHistorial(_historialCache[idx]);
+  renderHistorial();
 }
 
 function resetFiltros(){
