@@ -1815,146 +1815,117 @@ function toggleHistViaje(id){
 }
 
 function corregirViaje(id) {
-  const hist = getHistorial();
-  const v = hist.find(x => x.id === id);
+  const v = getHistorial().find(x => x.id === id);
   if (!v) return;
   const existing = document.getElementById('modalCorreccion');
   if (existing) existing.remove();
 
-  const ov = ['efectivo','transferencia'];
-  const fv = ['A','C'];
-  const ol = ['💵 Efectivo','🏦 Transferencia a AVEX'];
-  const fl = ['Factura A · +IVA','Factura C · sin IVA'];
+  const iStyle = 'width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:13px;padding:9px 12px;border-radius:6px;outline:none;box-sizing:border-box;font-family:Inter,sans-serif;';
+  const lStyle = 'font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;';
+
+  function campo(label, inputId, valor, tipo='text') {
+    return `<div><label style="${lStyle}">${label}</label><input id="${inputId}" type="${tipo}" value="${valor||''}" style="${iStyle}"></div>`;
+  }
 
   const overlay = document.createElement('div');
   overlay.id = 'modalCorreccion';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;';
 
-  const box = document.createElement('div');
-  box.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px;width:100%;max-width:420px;display:flex;flex-direction:column;gap:16px;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:100%;max-width:460px;display:flex;flex-direction:column;gap:14px;">
+      <div style="font-size:15px;font-weight:700;color:var(--text);">✏️ Corregir viaje <span style="font-size:11px;color:var(--muted);font-weight:400;">${v.id}</span></div>
 
-  const titulo = document.createElement('div');
-  titulo.style.cssText = 'font-size:15px;font-weight:700;color:var(--text);';
-  titulo.textContent = '✏️ Corregir viaje';
-  box.appendChild(titulo);
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${campo('Cliente', 'ce_cliente', v.cliente)}
+        ${campo('Teléfono', 'ce_tel', v.clienteTel)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${campo('Vehículo', 'ce_vehiculo', v.vehiculoCliente)}
+        ${campo('Patente', 'ce_patente', v.patenteCliente)}
+      </div>
+      ${campo('Origen', 'ce_origen', v.origen)}
+      ${campo('Destino', 'ce_destino', v.destino)}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${campo('Prestador', 'ce_prestador', v.prestadorNombre)}
+        ${campo('Tel. prestador', 'ce_prestadorTel', v.prestadorTel)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        ${campo('Distancia (km)', 'ce_km', v.km, 'number')}
+        ${campo('Total cobrado $', 'ce_total', v.total, 'number')}
+        ${campo('Zona', 'ce_zona', v.zona)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${campo('AVEX 40% $', 'ce_avex', v.montoAvex, 'number')}
+        ${campo('Prestador 60% $', 'ce_prest', v.montoPrestador, 'number')}
+      </div>
 
-  const sub = document.createElement('div');
-  sub.style.cssText = 'font-size:11px;color:var(--muted);';
-  sub.textContent = (v.origen||'') + ' → ' + (v.destino||'');
-  box.appendChild(sub);
+      <div>
+        <label style="${lStyle}">Forma de cobro</label>
+        <div style="display:flex;gap:8px;">
+          <div id="ce_cobro_ef" data-val="efectivo" onclick="ceSel('cobro','ef')" style="flex:1;border:2px solid ${v.formaCobro==='efectivo'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">💵 Efectivo</div>
+          <div id="ce_cobro_tr" data-val="transferencia" onclick="ceSel('cobro','tr')" style="flex:1;border:2px solid ${v.formaCobro==='transferencia'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">🏦 Transferencia</div>
+        </div>
+      </div>
 
-  // Forma de cobro
-  const secCobro = document.createElement('div');
-  const lblCobro = document.createElement('label');
-  lblCobro.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;';
-  lblCobro.textContent = 'Forma de cobro';
-  secCobro.appendChild(lblCobro);
-  const rowCobro = document.createElement('div');
-  rowCobro.style.cssText = 'display:flex;gap:8px;';
-  ov.forEach((val,i) => {
-    const btn = document.createElement('div');
-    btn.style.cssText = 'flex:1;border:2px solid '+(v.formaCobro===val?'var(--accent)':'var(--border)')+';border-radius:6px;padding:10px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;';
-    btn.textContent = ol[i];
-    btn.dataset.cobro = val;
-    if (v.formaCobro===val) btn.dataset.selected = '1';
-    btn.onclick = () => {
-      rowCobro.querySelectorAll('[data-cobro]').forEach(b => { b.style.borderColor='var(--border)'; delete b.dataset.selected; });
-      btn.style.borderColor = 'var(--accent)';
-      btn.dataset.selected = '1';
-    };
-    rowCobro.appendChild(btn);
-  });
-  secCobro.appendChild(rowCobro);
-  box.appendChild(secCobro);
+      <div>
+        <label style="${lStyle}">Tipo de factura</label>
+        <div style="display:flex;gap:8px;">
+          <div id="ce_fact_A" data-val="A" onclick="ceSel('fact','A')" style="flex:1;border:2px solid ${v.factura==='A'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura A · +IVA</div>
+          <div id="ce_fact_C" data-val="C" onclick="ceSel('fact','C')" style="flex:1;border:2px solid ${v.factura==='C'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura C · sin IVA</div>
+        </div>
+      </div>
 
-  // Tipo de factura
-  const secFact = document.createElement('div');
-  const lblFact = document.createElement('label');
-  lblFact.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;';
-  lblFact.textContent = 'Tipo de factura';
-  secFact.appendChild(lblFact);
-  const rowFact = document.createElement('div');
-  rowFact.style.cssText = 'display:flex;gap:8px;';
-  fv.forEach((val,i) => {
-    const btn = document.createElement('div');
-    btn.style.cssText = 'flex:1;border:2px solid '+(v.factura===val?'#A78BFA':'var(--border)')+';border-radius:6px;padding:10px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;';
-    btn.textContent = fl[i];
-    btn.dataset.factura = val;
-    if (v.factura===val) btn.dataset.selected = '1';
-    btn.onclick = () => {
-      rowFact.querySelectorAll('[data-factura]').forEach(b => { b.style.borderColor='var(--border)'; delete b.dataset.selected; });
-      btn.style.borderColor = '#A78BFA';
-      btn.dataset.selected = '1';
-    };
-    rowFact.appendChild(btn);
-  });
-  secFact.appendChild(rowFact);
-  box.appendChild(secFact);
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
+        <button onclick="document.getElementById('modalCorreccion').remove()" style="padding:9px 16px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:Inter,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button onclick="guardarCorreccion('${id}')" style="padding:9px 20px;border-radius:5px;border:none;background:var(--accent);color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Guardar cambios</button>
+      </div>
+    </div>`;
 
-  const nota = document.createElement('div');
-  nota.style.cssText = 'font-size:10px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:10px;';
-  nota.textContent = '⚠️ Al cambiar factura se recalcularán IVA, revenue AVEX y prestador automáticamente.';
-  box.appendChild(nota);
-
-  const acciones = document.createElement('div');
-  acciones.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
-
-  const btnCancelar = document.createElement('button');
-  btnCancelar.style.cssText = 'padding:9px 16px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:Inter,sans-serif;font-size:12px;font-weight:600;cursor:pointer;';
-  btnCancelar.textContent = 'Cancelar';
-  btnCancelar.onclick = () => overlay.remove();
-
-  const btnGuardar = document.createElement('button');
-  btnGuardar.style.cssText = 'padding:9px 16px;border-radius:5px;border:none;background:var(--accent);color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;';
-  btnGuardar.textContent = 'Guardar cambios';
-  btnGuardar.onclick = () => {
-    const cobroSel = rowCobro.querySelector('[data-cobro][data-selected]')?.dataset.cobro || v.formaCobro;
-    const factSel  = rowFact.querySelector('[data-factura][data-selected]')?.dataset.factura || v.factura;
-    guardarCorreccion(id, cobroSel, factSel);
-    overlay.remove();
-  };
-
-  acciones.appendChild(btnCancelar);
-  acciones.appendChild(btnGuardar);
-  box.appendChild(acciones);
-  overlay.appendChild(box);
   document.body.appendChild(overlay);
 }
 
-async function guardarCorreccion(id, cobro, factura) {
-  const hist = getHistorial();
-  const v = hist.find(x => x.id === id);
+function ceSel(tipo, val) {
+  if (tipo === 'cobro') {
+    document.getElementById('ce_cobro_ef').style.borderColor = val==='ef' ? 'var(--accent)' : 'var(--border)';
+    document.getElementById('ce_cobro_tr').style.borderColor = val==='tr' ? 'var(--accent)' : 'var(--border)';
+  } else {
+    document.getElementById('ce_fact_A').style.borderColor = val==='A' ? '#A78BFA' : 'var(--border)';
+    document.getElementById('ce_fact_C').style.borderColor = val==='C' ? '#A78BFA' : 'var(--border)';
+  }
+}
+
+async function guardarCorreccion(id) {
+  const v = getHistorial().find(x => x.id === id);
   if (!v) return;
 
-  v.formaCobro = cobro;
+  const g = (elId) => document.getElementById(elId)?.value.trim() || '';
+  const gn = (elId) => parseFloat(document.getElementById(elId)?.value) || 0;
 
-  if (factura !== v.factura) {
-    v.factura = factura;
-    const movida = v.montoMovida || 0;
-    let precio, iva;
-    if (factura === 'A') {
-      precio = v.total;
-      iva    = Math.round(precio * 0.21);
-      v.total = precio + iva;
-    } else {
-      precio = Math.round(v.total / 1.21);
-      iva    = 0;
-      v.total = precio;
-    }
-    const neta = Math.max(0, precio - movida);
-    v.montoIva       = iva;
-    v.montoPrestador = Math.round(neta * 0.6);
-    v.montoAvex      = Math.round(neta * 0.4);
-  }
+  v.cliente         = g('ce_cliente');
+  v.clienteTel      = g('ce_tel');
+  v.vehiculoCliente = g('ce_vehiculo');
+  v.patenteCliente  = g('ce_patente').toUpperCase();
+  v.origen          = g('ce_origen');
+  v.destino         = g('ce_destino');
+  v.prestadorNombre = g('ce_prestador');
+  v.prestadorTel    = g('ce_prestadorTel');
+  v.km              = g('ce_km');
+  v.zona            = g('ce_zona');
+  v.total           = gn('ce_total');
+  v.montoAvex       = gn('ce_avex');
+  v.montoPrestador  = gn('ce_prest');
+  v.formaCobro      = document.getElementById('ce_cobro_ef').style.borderColor.includes('accent') || document.getElementById('ce_cobro_ef').style.borderColor === 'var(--accent)' ? 'efectivo' : 'transferencia';
+  v.factura         = document.getElementById('ce_fact_A').style.borderColor.includes('A78BFA') ? 'A' : 'C';
 
   await guardarEnHistorial(v);
-  // También actualizar el viaje activo si existe
   const viajeActivo = _viajesActivosCache[id];
   if (viajeActivo) {
-    Object.assign(viajeActivo, {formaCobro:v.formaCobro, factura:v.factura, montoIva:v.montoIva, montoPrestador:v.montoPrestador, montoAvex:v.montoAvex, total:v.total});
+    Object.assign(viajeActivo, { cliente:v.cliente, clienteTel:v.clienteTel, origen:v.origen, destino:v.destino,
+      formaCobro:v.formaCobro, factura:v.factura, total:v.total, montoAvex:v.montoAvex, montoPrestador:v.montoPrestador });
     await guardarViajeActivo(viajeActivo);
   }
 
+  document.getElementById('modalCorreccion').remove();
   renderHistorial();
 }
 
