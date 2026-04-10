@@ -1975,10 +1975,11 @@ async function reenviarLink(id){
 
 async function eliminarViaje(id){
   if(!confirm('¿Eliminar este viaje del historial?'))return;
+  const { error } = await sb.from('viajes').delete().eq('viaje_id', id);
+  if (error) { alert('Error al eliminar: ' + error.message); return; }
+  await sb.from('viajes_activos').delete().eq('viaje_id', id);
   _historialCache = _historialCache.filter(v => v.id !== id);
   delete _viajesActivosCache[id];
-  await sb.from('viajes').delete().eq('viaje_id', id);
-  await sb.from('viajes_activos').delete().eq('viaje_id', id);
   actualizarContadorHistorial();
   renderHistorial();
 }
