@@ -1516,9 +1516,10 @@ async function confirmarViaje(){
   if(!d){alert('Primero calculá una ruta.');return;}
   const t=getTarifa(parseFloat(d.km));
   const movida=MOVIDA[zonaActual].monto;
-  const iva=facturaActual==='A'?t.precio*0.21:0;
-  const total=t.precio+iva;
-  const neta=Math.max(0,t.precio-movida);
+  const precioBase = precioOverride !== null ? precioOverride : t.precio;
+  const iva=facturaActual==='A'?precioBase*0.21:0;
+  const total=precioBase+iva;
+  const neta=Math.max(0,precioBase-movida);
   const viajeId='V'+Date.now().toString(36).toUpperCase();
   const viajeData={
     id:viajeId, estado:'pendiente', timestamps:{pendiente:Date.now()},
