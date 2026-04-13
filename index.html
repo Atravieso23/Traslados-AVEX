@@ -2934,10 +2934,12 @@ async function pAccion() {
   pViaje.timestamps = pViaje.timestamps || {};
   pViaje.timestamps[sig] = Date.now();
   pCobroSel = null;
-  await pGuardar(); pRender();
+  await pGuardar();
+  await guardarEnHistorial(pViaje);
+  pRender();
 }
 
-function pSelCobro(tipo) { pCobroSel = tipo; pViaje.estado = 'cobro'; pRender(); }
+async function pSelCobro(tipo) { pCobroSel = tipo; pViaje.estado = 'cobro'; await guardarEnHistorial(pViaje); pRender(); }
 
 async function pConfirmarCobro() {
   if (!pCobroSel) return;
