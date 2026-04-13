@@ -636,14 +636,20 @@ input::placeholder{color:#404040;}
     <div class="fact-note" id="factNote" style="margin-top:8px;margin-bottom:16px;">Factura A: el IVA se suma al presupuesto y se descuenta en el desglose.</div>
 
     <div class="sec-tag">03 — Origen y destino</div>
-    <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block;">Origen</label>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Origen</label>
+      <button onclick="abrirMapaPicker('origen')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:4px;">📍 Elegir en mapa</button>
+    </div>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:14px;">
       <div class="field"><label>Calle</label><input type="text" id="origenCalle" placeholder="Ej: Viamonte" oninput="actualizarDireccion('origen')"></div>
       <div class="field"><label>Altura</label><input type="text" id="origenAltura" placeholder="300" oninput="actualizarDireccion('origen')"></div>
       <div class="field"><label>Localidad</label><input type="text" id="origenLocalidad" placeholder="CABA" oninput="actualizarDireccion('origen')"></div>
     </div>
     <input type="hidden" id="origenInput">
-    <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block;">Destino</label>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Destino</label>
+      <button onclick="abrirMapaPicker('destino')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:4px;">📍 Elegir en mapa</button>
+    </div>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:6px;">
       <div class="field"><label>Calle</label><input type="text" id="destinoCalle" placeholder="Ej: Av. Maipú" oninput="actualizarDireccion('destino')"></div>
       <div class="field"><label>Altura</label><input type="text" id="destinoAltura" placeholder="1300" oninput="actualizarDireccion('destino')"></div>
@@ -651,6 +657,24 @@ input::placeholder{color:#404040;}
     </div>
     <input type="hidden" id="destinoInput">
     <div style="font-size:11px;color:var(--muted);margin-bottom:4px;" id="dirPreview"></div>
+
+    <!-- MODAL MAPA PICKER -->
+    <div id="mapaPickerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20000;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:600px;overflow:hidden;display:flex;flex-direction:column;">
+        <div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);" id="mapaPickerTitulo">Elegir punto</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Hacé clic en el mapa para marcar el punto</div>
+          </div>
+          <button onclick="cerrarMapaPicker()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;">✕</button>
+        </div>
+        <div id="mapaPickerMap" style="height:380px;width:100%;"></div>
+        <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+          <div style="flex:1;font-size:12px;color:var(--muted);" id="mapaPickerAddr">Sin punto seleccionado</div>
+          <button id="mapaPickerBtn" onclick="confirmarPuntoMapa()" disabled style="padding:9px 20px;border-radius:5px;border:none;background:var(--accent);color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;opacity:.4;">Confirmar →</button>
+        </div>
+      </div>
+    </div>
 
     <div class="sec-tag" style="margin-top:20px;">04 — Cliente y vehículo</div>
     <div class="route-grid" style="margin-bottom:12px;">
@@ -1260,6 +1284,80 @@ function parsearAsistencia(txt) {
     : '⚠ No se reconoció el formato. Verificá que el texto sea correcto.';
 }
 
+// ── MAPA PICKER ───────────────────────────────────────────────
+let _pickerTipo = null, _pickerMap = null, _pickerMarker = null, _pickerLatLng = null, _pickerAddr = null;
+
+function abrirMapaPicker(tipo) {
+  _pickerTipo = tipo;
+  _pickerLatLng = null;
+  _pickerAddr = null;
+  const overlay = document.getElementById('mapaPickerOverlay');
+  overlay.style.display = 'flex';
+  document.getElementById('mapaPickerTitulo').textContent = tipo === 'origen' ? '📍 Elegir Origen' : '📍 Elegir Destino';
+  document.getElementById('mapaPickerAddr').textContent = 'Hacé clic en el mapa para marcar el punto';
+  document.getElementById('mapaPickerBtn').disabled = true;
+  document.getElementById('mapaPickerBtn').style.opacity = '.4';
+
+  setTimeout(() => {
+    if (!_pickerMap) {
+      _pickerMap = L.map('mapaPickerMap').setView([-34.62, -58.44], 12);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        {attribution:'© OpenStreetMap © CARTO', maxZoom:19}).addTo(_pickerMap);
+      _pickerMap.on('click', onPickerClick);
+    } else {
+      _pickerMap.invalidateSize();
+    }
+    if (_pickerMarker) { _pickerMap.removeLayer(_pickerMarker); _pickerMarker = null; }
+  }, 100);
+}
+
+async function onPickerClick(e) {
+  const {lat, lng} = e.latlng;
+  if (_pickerMarker) _pickerMap.removeLayer(_pickerMarker);
+  _pickerMarker = L.circleMarker([lat, lng], {radius:8, color:'#22C55E', fillColor:'#22C55E', fillOpacity:1, weight:2}).addTo(_pickerMap);
+  document.getElementById('mapaPickerAddr').textContent = '⏳ Buscando dirección...';
+  document.getElementById('mapaPickerBtn').disabled = true;
+  document.getElementById('mapaPickerBtn').style.opacity = '.4';
+
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`, {headers:{'User-Agent':'AVEX-App/1.0'}});
+    const d = await res.json();
+    const addr = d.address || {};
+    const calle = addr.road || addr.pedestrian || addr.footway || '';
+    const altura = addr.house_number || '';
+    const localidad = addr.city || addr.town || addr.village || addr.suburb || addr.municipality || '';
+    const display = [calle, altura, localidad].filter(Boolean).join(' ');
+    _pickerLatLng = {lat, lng, calle, altura, localidad, display: d.display_name || display};
+    document.getElementById('mapaPickerAddr').textContent = display || d.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    document.getElementById('mapaPickerBtn').disabled = false;
+    document.getElementById('mapaPickerBtn').style.opacity = '1';
+  } catch(err) {
+    const display = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    _pickerLatLng = {lat, lng, calle:'', altura:'', localidad:'', display};
+    document.getElementById('mapaPickerAddr').textContent = display;
+    document.getElementById('mapaPickerBtn').disabled = false;
+    document.getElementById('mapaPickerBtn').style.opacity = '1';
+  }
+}
+
+function confirmarPuntoMapa() {
+  if (!_pickerLatLng || !_pickerTipo) return;
+  const {lat, lng, calle, altura, localidad, display} = _pickerLatLng;
+  const p = _pickerTipo;
+  document.getElementById(`${p}Calle`).value = calle;
+  document.getElementById(`${p}Altura`).value = altura;
+  document.getElementById(`${p}Localidad`).value = localidad;
+  document.getElementById(`${p}Input`).value = display;
+  // Guardar lat/lon para usarlos directamente en el cálculo
+  window[`_${p}LatLon`] = {lat, lon: lng};
+  actualizarDireccion(p);
+  cerrarMapaPicker();
+}
+
+function cerrarMapaPicker() {
+  document.getElementById('mapaPickerOverlay').style.display = 'none';
+}
+
 // ── ZONA ──────────────────────────────────────────────────────
 function setZona(el) {
   document.querySelectorAll('.zone-pill').forEach(p => p.classList.remove('active'));
@@ -1346,6 +1444,10 @@ function limpiarCalculadora() {
   // Bloque de pegar
   const pi = document.getElementById('pasteStatus');
   if(pi) pi.textContent = '';
+
+  // Limpiar coords del picker
+  window._origenLatLon = null;
+  window._destinoLatLon = null;
 
   // Scroll arriba
   window.scrollTo({top:0, behavior:'smooth'});
@@ -1460,16 +1562,19 @@ async function calcularRuta(){
   try{
     let oLat=parseFloat(oIn.dataset.lat),oLon=parseFloat(oIn.dataset.lon);
     let dLat=parseFloat(dIn.dataset.lat),dLon=parseFloat(dIn.dataset.lon);
+    // Usar coords del picker si están disponibles
+    if(window._origenLatLon){oLat=window._origenLatLon.lat;oLon=window._origenLatLon.lon;}
+    if(window._destinoLatLon){dLat=window._destinoLatLon.lat;dLon=window._destinoLatLon.lon;}
     if(!oLat||isNaN(oLat)){
       status.textContent='🔍 Geocodificando origen...';
       const g=await geocode(oIn.value);
-      if(!g)throw new Error('No se encontró el origen. Intentá con una dirección más completa, ej: "Viamonte 300, CABA".');
+      if(!g)throw new Error('No se encontró el origen. Intentá con una dirección más completa o usá el mapa.');
       oLat=g.lat;oLon=g.lon;
     }
     if(!dLat||isNaN(dLat)){
       status.textContent='🔍 Geocodificando destino...';
       const g=await geocode(dIn.value);
-      if(!g)throw new Error('No se encontró el destino. Intentá con una dirección más completa.');
+      if(!g)throw new Error('No se encontró el destino. Intentá con una dirección más completa o usá el mapa.');
       dLat=g.lat;dLon=g.lon;
     }
     status.textContent='🗺 Calculando ruta...';
