@@ -1285,9 +1285,9 @@ function parsearAsistencia(txt) {
 }
 
 // ── MAPA PICKER ───────────────────────────────────────────────
-let _pickerTipo = null, _pickerMap = null, _pickerMarker = null, _pickerLatLng = null, _pickerAddr = null;
+let _pickerTipo = null, _pickerMap = null, _pickerMarker = null, _pickerLatLng = null, _pickerAddr = null, _pickerTileLayer = null;
 
-function abrirMapaPicker(tipo) {
+async function abrirMapaPicker(tipo) {
   _pickerTipo = tipo;
   _pickerLatLng = null;
   _pickerAddr = null;
@@ -1298,16 +1298,44 @@ function abrirMapaPicker(tipo) {
   document.getElementById('mapaPickerBtn').disabled = true;
   document.getElementById('mapaPickerBtn').style.opacity = '.4';
 
-  setTimeout(() => {
+  const isLight = document.body.classList.contains('light');
+  const tileUrl = isLight
+    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+  setTimeout(async () => {
     if (!_pickerMap) {
       _pickerMap = L.map('mapaPickerMap').setView([-34.62, -58.44], 12);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        {attribution:'© OpenStreetMap © CARTO', maxZoom:19}).addTo(_pickerMap);
+      _pickerTileLayer = L.tileLayer(tileUrl, {attribution:'© OpenStreetMap © CARTO', maxZoom:19}).addTo(_pickerMap);
       _pickerMap.on('click', onPickerClick);
     } else {
+      // Actualizar tiles si cambió el tema
+      if (_pickerTileLayer) _pickerMap.removeLayer(_pickerTileLayer);
+      _pickerTileLayer = L.tileLayer(tileUrl, {attribution:'© OpenStreetMap © CARTO', maxZoom:19}).addTo(_pickerMap);
       _pickerMap.invalidateSize();
     }
     if (_pickerMarker) { _pickerMap.removeLayer(_pickerMarker); _pickerMarker = null; }
+
+    // Intentar zoom a la dirección ya escrita
+    const calle    = document.getElementById(`${tipo}Calle`)?.value.trim();
+    const altura   = document.getElementById(`${tipo}Altura`)?.value.trim();
+    const localidad= document.getElementById(`${tipo}Localidad`)?.value.trim();
+    const query    = [calle, altura, localidad].filter(Boolean).join(' ');
+    if (query.length > 2) {
+      document.getElementById('mapaPickerAddr').textContent = '⏳ Buscando zona...';
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query+' Argentina')}&format=json&limit=1`, {headers:{'User-Agent':'AVEX-App/1.0'}});
+        const d = await res.json();
+        if (d.length) {
+          const lat = parseFloat(d[0].lat), lng = parseFloat(d[0].lon);
+          _pickerMap.setView([lat, lng], 16);
+          // Marcador de referencia (gris, no confirmado)
+          if (_pickerMarker) _pickerMap.removeLayer(_pickerMarker);
+          _pickerMarker = L.circleMarker([lat, lng], {radius:8, color:'#6B7280', fillColor:'#6B7280', fillOpacity:.6, weight:2}).addTo(_pickerMap);
+        }
+      } catch(e) {}
+      document.getElementById('mapaPickerAddr').textContent = 'Hacé clic para confirmar o mover el punto';
+    }
   }, 100);
 }
 
