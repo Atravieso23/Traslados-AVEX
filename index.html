@@ -1793,6 +1793,8 @@ async function cambiarEstadoAdmin(viajeId, nuevoEstado) {
   if (!_historialCache[idx].timestamps) _historialCache[idx].timestamps = {};
   _historialCache[idx].timestamps[nuevoEstado] = Date.now();
   await guardarEnHistorial(_historialCache[idx]);
+  // También actualizar viajes_activos para que el sync no lo pise
+  await guardarViajeActivo(_historialCache[idx]);
   renderHistorial();
 }
 
