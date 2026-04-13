@@ -3158,6 +3158,35 @@ async function init() {
   renderZonaPills();
   actualizarContadorHistorial();
   setInterval(()=>{ if(viajeActivoId) actualizarMonitor(viajeActivoId); }, 3000);
+
+  // Sync periódico: actualiza estados de viajes activos en el historial
+  setInterval(sincronizarEstadosActivos, 8000);
+}
+
+async function sincronizarEstadosActivos() {
+  const pendientes = _historialCache.filter(v => v.estado !== 'completado');
+  if (!pendientes.length) return;
+  const ids = pendientes.map(v => v.viaje_id || v.id);
+  const { data, error } = await sb.from('viajes_activos').select('data').in('viaje_id', ids);
+  if (error || !data) return;
+  let hubocambio = false;
+  for (const row of data) {
+    const fresco = row.data;
+    if (!fresco) continue;
+    const idx = _historialCache.findIndex(v => v.id === fresco.id);
+    if (idx < 0) continue;
+    const actual = _historialCache[idx];
+    if (actual.estado !== fresco.estado) {
+      _historialCache[idx] = { ...actual, estado: fresco.estado, timestamps: { ...(actual.timestamps||{}), ...(fresco.timestamps||{}) } };
+      await guardarEnHistorial(_historialCache[idx]);
+      hubocambio = true;
+    }
+  }
+  if (hubocambio) {
+    actualizarContadorHistorial();
+    // Si el historial está abierto, re-renderizarlo
+    if (document.getElementById('pageHistorial')?.classList.contains('active')) renderHistorial();
+  }
 }
 
 init();
