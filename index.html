@@ -1574,7 +1574,7 @@ async function actualizarMonitor(viajeId){
     const line=document.getElementById(`msl-${i}`);
     if(line)line.classList.toggle('done',i<idx);
     const tEl=document.getElementById(`mst-${e}`);
-    if(tEl&&v.timestamps?.[e])tEl.textContent=new Date(v.timestamps[e]).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    if(tEl&&v.timestamps?.[e])tEl.textContent=new Date(v.timestamps[e]).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false});
   });
   const LABELS={'pendiente':'Esperando al prestador','en-camino':'En camino al origen','en-origen':'Llegó al origen','en-destino':'Llegó al destino','cobro':'Confirmando cobro','completado':'Viaje completado'};
   document.getElementById('monitorEstadoTxt').textContent=LABELS[v.estado]||v.estado;
@@ -1730,7 +1730,7 @@ function renderHistorial(){
   }
 
   lista.innerHTML=[...hist].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(v=>{
-    const fecha=v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    const fecha=v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
     const dur=v.timestamps?.completado&&v.timestamps?.['en-camino']
       ?Math.round((v.timestamps.completado-v.timestamps['en-camino'])/60000)+' min':'—';
     return `
@@ -2032,7 +2032,7 @@ function abrirPresupuesto(){
   const prestVehiculo=document.getElementById('prestadorVehiculoInput').value.trim()||'—';
   const prestPatente=document.getElementById('prestadorPatenteInput').value.trim().toUpperCase()||'—';
   const fecha=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const hora=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  const hora=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false});
   const nro='P-'+Date.now().toString().slice(-6);
   const centerLat=((parseFloat(d.oLat)+parseFloat(d.dLat))/2).toFixed(5);
   const centerLon=((parseFloat(d.oLon)+parseFloat(d.dLon))/2).toFixed(5);
@@ -2574,7 +2574,7 @@ function renderLiquidacionesPasadas(){
       <button onclick="borrarTodasLiquidaciones()" style="font-size:10px;background:none;border:none;color:var(--muted);cursor:pointer;" onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--muted)'">Borrar todo</button>
     </div>
     ${lqs.map((lq,idx)=>{
-      const fecha=new Date(lq.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const fecha=new Date(lq.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
       const accion=lq.tipo==='pagar'?'✅ AVEX pagó al prestador':lq.tipo==='cobrar'?'✅ Prestador pagó a AVEX':'✅ Saldo neutro';
       const cardId=`lqp_${idx}`;
       const detalleViajes=(lq.viajes||[]).map(v=>{
@@ -2681,7 +2681,7 @@ function cerrarLiqModal(){document.getElementById('modalLiqOverlay').style.displ
 function abrirComprobanteModal(){
   const v=_viajeComprobante; if(!v)return;
   const dur=v.timestamps?.completado&&v.timestamps?.['en-camino']?Math.round((v.timestamps.completado-v.timestamps['en-camino'])/60000)+' min':'—';
-  const fecha=new Date(v.timestamps?.completado||Date.now()).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const fecha=new Date(v.timestamps?.completado||Date.now()).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
   const row=(label,value,style='')=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;"><span style="color:#666;">${label}</span><span style="font-weight:600;${style}">${value}</span></div>`;
   document.getElementById('compPrintArea').innerHTML=`
     ${brandHeader('Comprobante de viaje','Servicio completado',`<div><strong>ID</strong> ${v.id}</div><div><strong>Fecha</strong> ${fecha}</div>`)}
@@ -2710,7 +2710,7 @@ function imprimirLiquidacion(btn){
   const saldoMonto=card.querySelector('.liq-saldo-monto')?.textContent||'';
   const saldoClass=card.querySelector('.liq-saldo-monto')?.className||'';
   const color=saldoClass.includes('pagar')?'#22C55E':saldoClass.includes('cobrar')?'#EF4444':'#888';
-  const fecha=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const fecha=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
   const filas=[...body.querySelectorAll('.liq-row')].map(r=>r.outerHTML).join('');
   const resItems=[...body.querySelectorAll('.liq-res-item')].map(el=>{
     const lbl=el.querySelector('.liq-res-label')?.textContent||'';
@@ -2969,7 +2969,7 @@ function pRender() {
   const tlHtml = PASOS.map((s, i) => {
     const done = i < idxActual || v.estado === 'completado';
     const act  = i === idxActual && v.estado !== 'completado';
-    const ts   = v.timestamps?.[s] ? new Date(v.timestamps[s]).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
+    const ts   = v.timestamps?.[s] ? new Date(v.timestamps[s]).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false}) : '';
     return `<div class="p-tl-step${done?' done':''}${act?' active':''}">
       <div class="p-tl-dot">${done?'✓':''}</div>
       <div class="p-tl-body">
