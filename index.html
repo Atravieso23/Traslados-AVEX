@@ -1757,7 +1757,7 @@ function renderHistorial(){
           `:''}
         </div>
         <div class="hist-actions">
-          <button class="hist-btn" onclick="reenviarLink('${v.id}')">📤 Reenviar link</button>
+          <button class="hist-btn" onclick="copiarLink('${v.id}', this)">🔗 Copiar link</button>
           <button class="hist-btn" onclick="corregirViaje('${v.id}')" style="border-color:var(--blue);color:var(--blue);">✏️ Corregir</button>
           <button class="hist-btn danger" onclick="eliminarViaje('${v.id}')">🗑 Eliminar</button>
           ${rolActual === 'admin@avex.com' ? `
@@ -1969,19 +1969,19 @@ async function guardarCorreccion(id) {
   renderHistorial();
 }
 
-async function reenviarLink(id){
+async function copiarLink(id, btn){
   let v = await obtenerViajeActivo(id);
-  if (!v) {
-    // Buscar en historial
-    v = getHistorial().find(x => x.id === id);
-  }
+  if (!v) v = getHistorial().find(x => x.id === id);
   if(!v){alert('No se encontraron los datos del viaje.');return;}
   const dataB64=btoa(unescape(encodeURIComponent(JSON.stringify(v))));
   const baseUrl=window.location.href.split('?')[0];
   const link=`${baseUrl}?data=${dataB64}`;
-  const nombre=v.prestadorNombre?.split(' ')[0]||'';
-  const msg=`Hola${nombre?' '+nombre:''}! Link del viaje AVEX:\n${link}\n\nOrigen: ${v.origen}\nDestino: ${v.destino}\nCliente: ${v.cliente}`;
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`);
+  await navigator.clipboard.writeText(link);
+  const orig = btn.textContent;
+  btn.textContent = '✓ Copiado';
+  btn.style.borderColor = 'var(--accent)';
+  btn.style.color = 'var(--accent)';
+  setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
 }
 
 async function eliminarViaje(id){
