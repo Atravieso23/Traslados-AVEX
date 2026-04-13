@@ -1729,7 +1729,7 @@ function renderHistorial(){
     return;
   }
 
-  lista.innerHTML=hist.map(v=>{
+  lista.innerHTML=[...hist].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(v=>{
     const fecha=v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
     const dur=v.timestamps?.completado&&v.timestamps?.['en-camino']
       ?Math.round((v.timestamps.completado-v.timestamps['en-camino'])/60000)+' min':'—';
