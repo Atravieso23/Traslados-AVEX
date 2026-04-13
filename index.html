@@ -1875,6 +1875,8 @@ function corregirViaje(id) {
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:100%;max-width:460px;display:flex;flex-direction:column;gap:14px;">
       <div style="font-size:15px;font-weight:700;color:var(--text);">✏️ Corregir viaje <span style="font-size:11px;color:var(--muted);font-weight:400;">${v.id}</span></div>
 
+      ${campo('Fecha y hora', 'ce_fecha', v.createdAt ? new Date(v.createdAt).toISOString().slice(0,16) : '', 'datetime-local')}
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         ${campo('Cliente', 'ce_cliente', v.cliente)}
         ${campo('Teléfono', 'ce_tel', v.clienteTel)}
@@ -1940,6 +1942,9 @@ async function guardarCorreccion(id) {
 
   const g = (elId) => document.getElementById(elId)?.value.trim() || '';
   const gn = (elId) => parseFloat(document.getElementById(elId)?.value) || 0;
+
+  const fechaVal = document.getElementById('ce_fecha')?.value;
+  if (fechaVal) v.createdAt = new Date(fechaVal).getTime();
 
   v.cliente         = g('ce_cliente');
   v.clienteTel      = g('ce_tel');
