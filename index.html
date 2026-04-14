@@ -2601,11 +2601,11 @@ function renderLiquidaciones(){
 
     // Lo que el prestador le debe pasar a AVEX (viajes efectivo):
     // cobró el total → le devuelve Rev.AVEX + IVA (AVEX se queda con su 40% + IVA)
-    const prestDebeAAvex = cobradoPrest - (revPrestEfectivo + movPrest) * 1.21;
+    const prestDebeAAvex = cobradoPrest - (revPrestEfectivo + movPrest);
 
     // Lo que AVEX le debe pagar al prestador (viajes transferencia):
-    // AVEX cobró todo → le paga (60% + movida) × 1.21
-    const avexDebeAPrest = (revAvexTransf + movAvex) * 1.21;
+    // AVEX cobró todo → le paga 60% + movida (sin IVA al prestador)
+    const avexDebeAPrest = revAvexTransf + movAvex;
 
     // Movimiento neto (desde perspectiva de AVEX):
     // + prestDebeAAvex = entra plata a AVEX
@@ -2618,8 +2618,7 @@ function renderLiquidaciones(){
     // Para el botón marcar como liquidado usamos el neto
     const neto = movimiento;
 
-    const pagoAPrest = (totalRevPrest + totalMovida) * 1.21;
-    const ivaPrest   = (totalRevPrest + totalMovida) * 0.21;
+    // Prestadores no tienen IVA en sus pagos
 
     const id='liq_'+nombre.replace(/\W/g,'_');
     const inicial=nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
@@ -2652,17 +2651,14 @@ function renderLiquidaciones(){
     // IVA solo de viajes donde cobró AVEX (transferencia)
     // Posición del prestador (todos los viajes del período)
     const totalPrestSinIva = totalRevPrest + totalMovida;
-    const ivaSobrePrest    = totalPrestSinIva * 0.21;
-    const totalPrestCIva   = totalPrestSinIva * 1.21;
 
     // Posición de AVEX (todos los viajes del período)
     const totalRevAvexPeriodo = totalRevAvex;
     const totalIvaPeriodo     = totalIva;
     const totalAvexPeriodo    = totalRevAvexPeriodo + totalIvaPeriodo;
 
-    // Neteo de caja
-    // AVEX le debe al prestador totalPrestCIva, pero el prestador ya cobró cobradoPrest por cuenta de AVEX
-    const avexDebeNetoAPrest = totalPrestCIva - cobradoPrest; // >0 AVEX paga, <0 prestador paga
+    // Neteo de caja — prestadores no pagan IVA
+    const avexDebeNetoAPrest = totalPrestSinIva - cobradoPrest; // >0 AVEX paga, <0 prestador paga
 
     const resumenHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
@@ -2672,9 +2668,7 @@ function renderLiquidaciones(){
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">${nombre}</div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Revenue traslados (60%)</span><span style="font-weight:600;color:var(--accent);">${fmt(totalRevPrest)}</span></div>
           ${totalMovida>0?`<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Movidas</span><span style="font-weight:600;color:var(--orange,#F59E0B);">${fmt(totalMovida)}</span></div>`:''}
-          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Subtotal</span><span style="font-weight:600;">${fmt(totalPrestSinIva)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">IVA (21%)</span><span style="font-weight:600;color:#A78BFA;">${fmt(ivaSobrePrest)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;font-weight:700;border-bottom:2px solid var(--border);margin-bottom:8px;"><span>Total c/IVA</span><span style="color:var(--accent);">${fmt(totalPrestCIva)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;font-weight:700;border-bottom:2px solid var(--border);margin-bottom:8px;"><span>Total a pagar</span><span style="color:var(--accent);">${fmt(totalPrestSinIva)}</span></div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Cobrado por el prestador</span><span style="font-weight:600;">${fmt(cobradoPrest)}</span></div>
           <div style="display:flex;justify-content:space-between;padding:7px 0;font-size:13px;font-weight:700;margin-top:2px;">
             <span style="color:${avexDebeNetoAPrest>=0?'var(--accent)':'#EF4444'};">${avexDebeNetoAPrest>=0?'AVEX paga al prestador':'Prestador paga a AVEX'}</span>
@@ -2693,21 +2687,20 @@ function renderLiquidaciones(){
             <span style="color:${avexDebeNetoAPrest<0?'#EF4444':'var(--blue)'};">${avexDebeNetoAPrest<0?'Prestador paga a AVEX':'Saldo pendiente al prestador'}</span>
             <span style="color:${avexDebeNetoAPrest<0?'#EF4444':'var(--blue)'};">${fmt(Math.abs(avexDebeNetoAPrest))}</span>
           </div>
-          ${ivaSobrePrest>0?`<div style="font-size:10px;color:var(--muted);margin-top:4px;">Crédito fiscal prest.: ${fmt(ivaSobrePrest)}</div>`:''}
         </div>
 
       </div>
 
       <div style="margin-top:10px;background:${avexDebeNetoAPrest<0?'rgba(239,68,68,.08)':'rgba(34,197,94,.08)'};border:1px solid ${avexDebeNetoAPrest<0?'#EF4444':'var(--accent)'};border-radius:6px;padding:14px 16px;">
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">⚖️ Neteo del período</div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;"><span style="color:var(--muted);">Le corresponde al prestador c/IVA</span><span style="font-weight:600;color:var(--accent);">${fmt(totalPrestCIva)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;"><span style="color:var(--muted);">Le corresponde al prestador</span><span style="font-weight:600;color:var(--accent);">${fmt(totalPrestSinIva)}</span></div>
         <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;"><span style="color:var(--muted);">Cobrado por el prestador</span><span style="font-weight:600;color:#EF4444;">${fmt(cobradoPrest)}</span></div>
         <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:15px;font-weight:700;border-top:2px solid ${avexDebeNetoAPrest<0?'#EF4444':'var(--accent)'};margin-top:6px;">
           <span style="color:${avexDebeNetoAPrest<0?'#EF4444':'var(--accent)'};">${avexDebeNetoAPrest>=0?'AVEX paga al prestador':'Prestador paga a AVEX'}</span>
           <span style="font-size:22px;color:${avexDebeNetoAPrest<0?'#EF4444':'var(--accent)'};">${fmt(Math.abs(avexDebeNetoAPrest))}</span>
         </div>
       </div>
-      <div style="margin-top:6px;font-size:10px;color:var(--muted);text-align:right;">IVA débito → AFIP: ${fmt(totalIva)} · Crédito fiscal prest.: ${fmt(ivaSobrePrest)}</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--muted);text-align:right;">IVA débito → AFIP: ${fmt(totalIva)}</div>
     `;
 
     return `<div class="liq-card" id="${id}">
@@ -3380,8 +3373,8 @@ function pRender() {
     ${navOrigen}
     <div class="p-card" style="overflow:hidden;"><div id="p-map" style="height:200px;"></div></div>
     <div class="p-total">
-      <div><div class="p-total-label">Total del servicio</div><div><span class="p-total-price">${fmt(v.total-(v.montoIva||0))}</span><span class="p-total-cur">ARS</span></div></div>
-      <div class="p-total-right"><div>Tu parte</div><div class="p-total-parte">${fmt((v.montoPrestador||0)+(v.montoMovida||0))}</div><div>Sin IVA</div></div>
+      <div><div class="p-total-label">Total del servicio</div><div><span class="p-total-price">${fmt(v.total)}</span><span class="p-total-cur">ARS</span></div></div>
+      <div class="p-total-right"><div>Tu parte</div><div class="p-total-parte">${fmt((v.montoPrestador||0)+(v.montoMovida||0))}</div><div>Factura ${v.factura||'C'}</div></div>
     </div>
     <div class="p-card"><div class="p-card-title">Estado del viaje</div><div class="p-tl">${tlHtml}</div></div>
     ${fotosHtml}
