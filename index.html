@@ -629,14 +629,26 @@ input::placeholder{color:#404040;}
       </div>
     </div>
 
-    <div class="sec-tag" style="margin-top:4px;">02 — Tipo de factura</div>
+    <div class="sec-tag" style="margin-top:4px;">02 — Tipo de servicio</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="calc-tipo-pill" data-tipo="particular" onclick="switchCalcTipo('particular')"
+        style="padding:7px 22px;border-radius:20px;border:1px solid var(--blue);background:rgba(59,130,246,.15);color:var(--blue);font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .18s;">
+        🚗 Particular
+      </button>
+      <button class="calc-tipo-pill" data-tipo="claims" onclick="switchCalcTipo('claims')"
+        style="padding:7px 22px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all .18s;">
+        📋 Claims
+      </button>
+    </div>
+
+    <div class="sec-tag" style="margin-top:4px;">03 — Tipo de factura</div>
     <div class="factura-row">
       <div class="fact-pill" data-fact="C" onclick="setFactura(this)">Factura C</div>
       <div class="fact-pill active" data-fact="A" onclick="setFactura(this)">Factura A · +21% IVA</div>
     </div>
     <div class="fact-note" id="factNote" style="margin-top:8px;margin-bottom:16px;">Factura A: el IVA se suma al presupuesto y se descuenta en el desglose.</div>
 
-    <div class="sec-tag">03 — Origen y destino</div>
+    <div class="sec-tag">04 — Origen y destino</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Origen</label>
       <button onclick="abrirMapaPicker('origen')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:4px;">📍 Elegir en mapa</button>
@@ -677,7 +689,7 @@ input::placeholder{color:#404040;}
       </div>
     </div>
 
-    <div class="sec-tag" style="margin-top:20px;">04 — Cliente y vehículo</div>
+    <div class="sec-tag" style="margin-top:20px;">05 — Cliente y vehículo</div>
     <div class="route-grid" style="margin-bottom:12px;">
       <div class="field"><label>Cliente / Empresa</label><input type="text" id="clienteInput" placeholder="Ej: Juan García"></div>
       <div class="field"><label>Teléfono / WhatsApp</label><input type="text" id="telefonoInput" placeholder="Ej: 11 5555-0000"></div>
@@ -687,7 +699,7 @@ input::placeholder{color:#404040;}
       <div class="field"><label>Patente</label><input type="text" id="patenteInput" placeholder="Ej: AB 123 CD" style="text-transform:uppercase;"></div>
     </div>
 
-    <div class="sec-tag" style="margin-top:20px;">05 — Datos del prestador</div>
+    <div class="sec-tag" style="margin-top:20px;">06 — Datos del prestador</div>
     <div class="route-grid" style="margin-bottom:12px;">
       <div class="field">
         <label>Prestador</label>
@@ -911,6 +923,18 @@ input::placeholder{color:#404040;}
       <button onclick="resetearTarifario()" style="padding:6px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;" onmouseover="this.style.borderColor='#EF4444';this.style.color='#EF4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">↺ Restaurar defaults</button>
     </div>
   </div>
+
+  <!-- Selector de tipo de tarifario -->
+  <div style="display:flex;gap:8px;margin-bottom:18px;">
+    <button class="tarifa-tipo-pill" data-tipo="particular" onclick="switchTarifaTipo('particular')"
+      style="padding:9px 28px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .18s;">
+      🚗 Particular
+    </button>
+    <button class="tarifa-tipo-pill" data-tipo="claims" onclick="switchTarifaTipo('claims')"
+      style="padding:9px 28px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .18s;">
+      📋 Claims
+    </button>
+  </div>
   <div class="card" style="margin-bottom:16px;">
     <div class="sec-tag" style="padding:14px 18px 0;">Tramos por distancia</div>
     <div style="padding:14px 18px;">
@@ -1053,19 +1077,35 @@ const MOVIDA_DEFAULT = {
   norte_cercano: {nombre:'Zona Norte · hasta Tortuguitas', monto:17000, activa:true},
   norte_lejano:  {nombre:'Pilar / Tigre',                 monto:20000, activa:true},
 };
-function cargarTarifario() {
+// Tipo activo en el editor de tarifario y en la calculadora
+let tarifaTipo = 'particular'; // 'particular' | 'claims'
+let calcTipo   = 'particular';
+
+function parsearTarifas(raw, defaults) {
   try {
-    const t = localStorage.getItem('avex-tarifas');
-    const m = localStorage.getItem('avex-movidas');
-    let tarifas = t ? JSON.parse(t) : TARIFAS_DEFAULT;
+    let tarifas = raw ? JSON.parse(raw) : defaults;
     tarifas = tarifas.map((tr, i) => ({
       ...tr,
       max: (tr.max === null || tr.max === 'Infinity' || i === tarifas.length - 1) ? Infinity : Number(tr.max)
     }));
-    // Ordenar siempre de menor a mayor, Infinity al final
     tarifas.sort((a,b) => { if(a.max===Infinity)return 1; if(b.max===Infinity)return -1; return a.max-b.max; });
-    return { tarifas, movidas: m ? JSON.parse(m) : MOVIDA_DEFAULT };
-  } catch(e) { return { tarifas: TARIFAS_DEFAULT, movidas: MOVIDA_DEFAULT }; }
+    return tarifas;
+  } catch(e) { return defaults.map(t=>({...t})); }
+}
+
+function cargarTarifas(tipo) {
+  // Migrar clave vieja avex-tarifas → avex-tarifas-particular
+  if (tipo === 'particular' && !localStorage.getItem('avex-tarifas-particular') && localStorage.getItem('avex-tarifas')) {
+    localStorage.setItem('avex-tarifas-particular', localStorage.getItem('avex-tarifas'));
+  }
+  return parsearTarifas(localStorage.getItem(`avex-tarifas-${tipo}`), TARIFAS_DEFAULT);
+}
+
+function cargarTarifario() {
+  try {
+    const m = localStorage.getItem('avex-movidas');
+    return { tarifas: cargarTarifas('particular'), movidas: m ? JSON.parse(m) : MOVIDA_DEFAULT };
+  } catch(e) { return { tarifas: TARIFAS_DEFAULT.map(t=>({...t})), movidas: MOVIDA_DEFAULT }; }
 }
 let { tarifas: TARIFAS, movidas: MOVIDA } = cargarTarifario();
 Object.keys(MOVIDA).forEach(k => {
@@ -1478,6 +1518,9 @@ function limpiarCalculadora() {
   window._origenLatLon = null;
   window._destinoLatLon = null;
 
+  // Resetear tipo de servicio a Particular
+  switchCalcTipo('particular');
+
   // Scroll arriba
   window.scrollTo({top:0, behavior:'smooth'});
 }
@@ -1709,7 +1752,7 @@ async function confirmarViaje(){
     prestadorVehiculo:document.getElementById('prestadorVehiculoInput').value||'—',
     prestadorPatente:document.getElementById('prestadorPatenteInput').value||'—',
     total,montoPrestador:neta*0.6,montoAvex:neta*0.4,montoIva:iva,montoMovida:movida,
-    factura:facturaActual,zona:ZONA_NOMBRES[zonaActual],
+    factura:facturaActual,zona:ZONA_NOMBRES[zonaActual],tipoServicio:calcTipo,
   };
   await guardarViajeActivo(viajeData);
   await guardarEnHistorial(viajeData);
@@ -1908,7 +1951,7 @@ function renderHistorial(){
     <div class="hist-viaje" id="hv-${v.id}">
       <div class="hist-viaje-header" onclick="toggleHistViaje('${v.id}')">
         <div style="flex:1;">
-          <div class="hist-viaje-id">${v.id} · ${fecha}</div>
+          <div class="hist-viaje-id">${v.id} · ${fecha}${v.tipoServicio==='claims'?' · <span style="color:var(--blue);font-weight:700;">Claims</span>':''}</div>
           <div class="hist-viaje-ruta">${v.origen.split(',')[0]} <span>→</span> ${v.destino.split(',')[0]}</div>
         </div>
         <div class="hist-estado-badge ${v.estado}">${v.estado==='completado'?'✓ Completado':v.estado.replace('-',' ')}</div>
@@ -2421,11 +2464,45 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')cerrarPresupuesto();
 
 
 // ── TARIFARIO EDITOR ──────────────────────────────────────────
+
+// Cambiar tipo activo en el EDITOR de tarifario
+function switchTarifaTipo(tipo) {
+  tarifaTipo = tipo;
+  TARIFAS.length = 0;
+  cargarTarifas(tipo).forEach(t => TARIFAS.push(t));
+  document.querySelectorAll('.tarifa-tipo-pill').forEach(p => {
+    const isActive = p.dataset.tipo === tipo;
+    p.style.background = isActive ? 'var(--accent-dim)' : 'var(--surface2)';
+    p.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+    p.style.color = isActive ? 'var(--accent)' : 'var(--muted)';
+    p.style.fontWeight = isActive ? '700' : '500';
+  });
+  renderFilasTarifas(); renderPreviewTarifario();
+}
+
+// Cambiar tipo de servicio en la CALCULADORA
+function switchCalcTipo(tipo) {
+  calcTipo = tipo;
+  TARIFAS.length = 0;
+  cargarTarifas(tipo).forEach(t => TARIFAS.push(t));
+  document.querySelectorAll('.calc-tipo-pill').forEach(p => {
+    const isActive = p.dataset.tipo === tipo;
+    p.style.background = isActive ? 'rgba(59,130,246,.15)' : 'var(--surface2)';
+    p.style.borderColor = isActive ? 'var(--blue)' : 'var(--border)';
+    p.style.color = isActive ? 'var(--blue)' : 'var(--muted)';
+    p.style.fontWeight = isActive ? '700' : '500';
+  });
+  renderTabla(-1);
+  // Si ya hay resultado visible, recalcular
+  if (document.getElementById('resultWrap').classList.contains('visible') && window._presData) {
+    updateRevenue(parseFloat(window._presData.km));
+  }
+}
+
 function resetearTarifario(){
-  if(!confirm('¿Restaurar el tarifario a los valores por defecto? Se perderán los cambios guardados.'))return;
-  localStorage.removeItem('avex-tarifas');
+  if(!confirm(`¿Restaurar el tarifario "${tarifaTipo === 'particular' ? 'Particular' : 'Claims'}" a los valores por defecto?`))return;
+  localStorage.removeItem(`avex-tarifas-${tarifaTipo}`);
   localStorage.removeItem('avex-movidas');
-  // Recargar desde defaults
   TARIFAS.length=0; TARIFAS_DEFAULT.forEach(t=>TARIFAS.push({...t}));
   Object.keys(MOVIDA).forEach(k=>delete MOVIDA[k]);
   Object.assign(MOVIDA, JSON.parse(JSON.stringify(MOVIDA_DEFAULT)));
@@ -2516,7 +2593,7 @@ function guardarTarifario(){
     if (b.max === Infinity) return -1;
     return a.max - b.max;
   });
-  localStorage.setItem('avex-tarifas',JSON.stringify(TARIFAS));
+  localStorage.setItem(`avex-tarifas-${tarifaTipo}`,JSON.stringify(TARIFAS));
   localStorage.setItem('avex-movidas',JSON.stringify(MOVIDA));
   renderZonaPills(); renderTabla(-1); renderPreviewTarifario();
 }
@@ -3455,9 +3532,11 @@ async function initModoPrestador() {
 
 // ── INIT ──────────────────────────────────────────────────────
 // Reset tarifas si no coincide con la versión actual
-const TARIFA_VERSION = 'v6';
+const TARIFA_VERSION = 'v7';
 if (localStorage.getItem('avex-tarifa-ver') !== TARIFA_VERSION) {
   localStorage.removeItem('avex-tarifas');
+  localStorage.removeItem('avex-tarifas-particular');
+  localStorage.removeItem('avex-tarifas-claims');
   localStorage.setItem('avex-tarifa-ver', TARIFA_VERSION);
 }
 
