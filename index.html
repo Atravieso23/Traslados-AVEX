@@ -2553,15 +2553,15 @@ function renderLiquidaciones(){
   viajes.forEach(v=>{const n=v.prestadorNombre||'Sin nombre';if(!porPrestador[n])porPrestador[n]=[];porPrestador[n].push(v);});
 
   // Stats globales
-  let gTotalFact=0, gIva=0, gRevAvex=0, gRevPrest=0;
+  let gTotalFact=0, gIva=0, gRevAvex=0, gRevPrest=0, gMovida=0;
   viajes.forEach(v=>{
     gTotalFact+=(v.total||0);
     gIva+=(v.montoIva||0);
     gRevAvex+=(v.montoAvex||0);
     gRevPrest+=(v.montoPrestador||0);
+    gMovida+=(v.montoMovida||0);
   });
-  const gPagoAPrest = gRevPrest * 1.21; // lo que AVEX le transfiere incluyendo IVA del prestador
-  const gIvaPrest   = gRevPrest * 0.21; // crédito fiscal de AVEX
+  const gTotalPrest = gRevPrest + gMovida;
 
   resEl.innerHTML=`
     <div class="hist-stat"><div class="hist-stat-label">Prestadores</div><div class="hist-stat-value">${Object.keys(porPrestador).length}</div></div>
@@ -2569,7 +2569,9 @@ function renderLiquidaciones(){
     <div class="hist-stat"><div class="hist-stat-label">Total facturado</div><div class="hist-stat-value">${fmt(gTotalFact)}</div></div>
     <div class="hist-stat"><div class="hist-stat-label">IVA débito → AFIP</div><div class="hist-stat-value" style="color:#A78BFA;">${fmt(gIva)}</div></div>
     <div class="hist-stat"><div class="hist-stat-label">Revenue AVEX</div><div class="hist-stat-value" style="color:var(--blue);">${fmt(gRevAvex)}</div></div>
-    <div class="hist-stat"><div class="hist-stat-label">Pago a prestadores</div><div class="hist-stat-value" style="color:var(--accent);">${fmt(gPagoAPrest)}<span style="font-size:10px;color:var(--muted);display:block;">incl. IVA ${fmt(gIvaPrest)}</span></div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Rev. prestadores</div><div class="hist-stat-value" style="color:var(--accent);">${fmt(gRevPrest)}</div></div>
+    ${gMovida>0?`<div class="hist-stat"><div class="hist-stat-label">Movidas</div><div class="hist-stat-value" style="color:var(--orange,#F59E0B);">${fmt(gMovida)}</div></div>`:''}
+    <div class="hist-stat"><div class="hist-stat-label">Total prestadores</div><div class="hist-stat-value" style="color:var(--accent);font-size:18px;">${fmt(gTotalPrest)}</div></div>
   `;
 
   // CSS para 7 columnas
@@ -2708,7 +2710,7 @@ function renderLiquidaciones(){
         <div class="liq-avatar">${inicial}</div>
         <div class="liq-info">
           <div class="liq-nombre">${nombre}</div>
-          <div class="liq-meta">${vjs.length} viaje${vjs.length!==1?'s':''} · Facturado: ${fmt(totalFact)} · Rev. AVEX: ${fmt(totalRevAvex)}</div>
+          <div class="liq-meta">${vjs.length} viaje${vjs.length!==1?'s':''} · Rev. prestador: ${fmt(totalRevPrest)}${totalMovida>0?' · Movidas: '+fmt(totalMovida):''}</div>
         </div>
         <div class="liq-saldo">
           <div class="liq-saldo-label">${saldoLabel}</div>
