@@ -2108,37 +2108,47 @@ function corregirViaje(id) {
           ${campo('IVA $', 'ce_iva', v.montoIva||0, 'number')}
           ${campo('Distancia (km)', 'ce_km', v.km, 'number')}
         </div>
+
+        <div>
+          <label style="${lStyle}">Tipo de factura</label>
+          <div style="display:flex;gap:8px;">
+            <div id="ce_fact_A" data-sel="${v.factura==='A'?'1':'0'}" onclick="ceSel('fact','A')" style="flex:1;border:2px solid ${v.factura==='A'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura A · +IVA</div>
+            <div id="ce_fact_C" data-sel="${v.factura!=='A'?'1':'0'}" onclick="ceSel('fact','C')" style="flex:1;border:2px solid ${v.factura!=='A'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura C · sin IVA</div>
+          </div>
+        </div>
+
+        <div>
+          <label style="${lStyle}">Forma de cobro</label>
+          <div style="display:flex;gap:8px;">
+            <div id="ce_cobro_ef" data-sel="${v.formaCobro==='efectivo'?'1':'0'}" onclick="ceSel('cobro','ef')" style="flex:1;border:2px solid ${v.formaCobro==='efectivo'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">💵 Efectivo</div>
+            <div id="ce_cobro_tr" data-sel="${v.formaCobro==='transferencia'?'1':'0'}" onclick="ceSel('cobro','tr')" style="flex:1;border:2px solid ${v.formaCobro==='transferencia'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">🏦 Transferencia</div>
+          </div>
+        </div>
+
         <div style="border-top:1px solid var(--border);padding-top:10px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Resultado</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <label style="${lStyle};margin:0;">% distribución</label>
+            <span style="font-size:11px;color:var(--muted);">AVEX <span id="ce_pct_avex_lbl">40</span>% · Prestador <span id="ce_pct_prest_lbl">60</span>%</span>
+          </div>
+          <input id="ce_slider" type="range" min="10" max="90" value="${Math.round((v.montoAvex/(v.montoAvex+v.montoPrestador||1))*100)||40}"
+            oninput="ceSliderChange(this.value)"
+            style="width:100%;accent-color:var(--accent);cursor:pointer;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;">
             <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
               <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Total cliente</div>
               <div id="ce_res_total" style="font-size:14px;font-weight:700;color:var(--text);">—</div>
             </div>
             <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
-              <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">AVEX 40%</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">AVEX <span id="ce_pct_avex_lbl2">40</span>%</div>
               <div id="ce_res_avex" style="font-size:14px;font-weight:700;color:var(--blue);">—</div>
             </div>
             <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
-              <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Prestador 60%</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Prestador <span id="ce_pct_prest_lbl2">60</span>%</div>
               <div id="ce_res_prest" style="font-size:14px;font-weight:700;color:var(--accent);">—</div>
             </div>
           </div>
         </div>
-        <div>
-          <label style="${lStyle}">Forma de cobro</label>
-          <div style="display:flex;gap:8px;">
-            <div id="ce_cobro_ef" onclick="ceSel('cobro','ef')" style="flex:1;border:2px solid ${v.formaCobro==='efectivo'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">💵 Efectivo</div>
-            <div id="ce_cobro_tr" onclick="ceSel('cobro','tr')" style="flex:1;border:2px solid ${v.formaCobro==='transferencia'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">🏦 Transferencia</div>
-          </div>
-        </div>
-        <div>
-          <label style="${lStyle}">Tipo de factura</label>
-          <div style="display:flex;gap:8px;">
-            <div id="ce_fact_A" onclick="ceSel('fact','A')" style="flex:1;border:2px solid ${v.factura==='A'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura A · +IVA</div>
-            <div id="ce_fact_C" onclick="ceSel('fact','C')" style="flex:1;border:2px solid ${v.factura==='C'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura C · sin IVA</div>
-          </div>
-        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           ${campo('Zona', 'ce_zona', v.zona)}
         </div>
@@ -2154,7 +2164,6 @@ function corregirViaje(id) {
 
   // Calcular tarifa base correctamente
   const facturaActiva = v.factura || 'C';
-  const movida = v.montoMovida || 0;
   let base;
   if (facturaActiva === 'A') {
     base = Math.round(v.total / 1.21);
@@ -2164,8 +2173,17 @@ function corregirViaje(id) {
   document.getElementById('ce_base').value = base;
   document.getElementById('ce_iva').value = v.montoIva || 0;
 
+  // Inicializar slider con el % actual
+  const totalNeta = (v.montoAvex || 0) + (v.montoPrestador || 0);
+  const pctAvexActual = totalNeta > 0 ? Math.round((v.montoAvex / totalNeta) * 100) : 40;
+  const slider = document.getElementById('ce_slider');
+  if (slider) {
+    slider.value = pctAvexActual;
+    ceSliderChange(pctAvexActual);
+  }
+
   // Listeners para recalcular
-  ['ce_base','ce_movida','ce_iva'].forEach(id => {
+  ['ce_base','ce_movida'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', ceRecalcular);
   });
   ceRecalcular();
@@ -2179,16 +2197,29 @@ function ceToggle(sec) {
   arr.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
 }
 
+function ceGetFactura() {
+  return document.getElementById('ce_fact_A')?.dataset.sel === '1' ? 'A' : 'C';
+}
+
+function ceSliderChange(pctAvex) {
+  document.getElementById('ce_pct_avex_lbl').textContent  = pctAvex;
+  document.getElementById('ce_pct_avex_lbl2').textContent = pctAvex;
+  document.getElementById('ce_pct_prest_lbl').textContent  = 100 - pctAvex;
+  document.getElementById('ce_pct_prest_lbl2').textContent = 100 - pctAvex;
+  ceRecalcular();
+}
+
 function ceRecalcular() {
   const base   = parseFloat(document.getElementById('ce_base')?.value) || 0;
   const movida = parseFloat(document.getElementById('ce_movida')?.value) || 0;
-  const factA  = document.getElementById('ce_fact_A')?.style.borderColor.includes('A78BFA');
+  const factA  = ceGetFactura() === 'A';
   const iva    = factA ? Math.round(base * 0.21) : 0;
   const total  = base + iva;
   const neta   = Math.max(0, base - movida);
-  const avex   = Math.round(neta * 0.4);
-  const prest  = Math.round(neta * 0.6);
-  // Actualizar IVA automáticamente si es factura A
+  const pctAvex = parseInt(document.getElementById('ce_slider')?.value || 40);
+  const avex    = Math.round(neta * pctAvex / 100);
+  const prest   = Math.round(neta * (100 - pctAvex) / 100);
+  // Actualizar IVA
   const ivaEl = document.getElementById('ce_iva');
   if (ivaEl) ivaEl.value = iva;
   // Mostrar resultado
@@ -2200,12 +2231,16 @@ function ceRecalcular() {
 
 function ceSel(tipo, val) {
   if (tipo === 'cobro') {
+    document.getElementById('ce_cobro_ef').dataset.sel = val==='ef' ? '1' : '0';
+    document.getElementById('ce_cobro_tr').dataset.sel = val==='tr' ? '1' : '0';
     document.getElementById('ce_cobro_ef').style.borderColor = val==='ef' ? 'var(--accent)' : 'var(--border)';
     document.getElementById('ce_cobro_tr').style.borderColor = val==='tr' ? 'var(--accent)' : 'var(--border)';
   } else {
+    document.getElementById('ce_fact_A').dataset.sel = val==='A' ? '1' : '0';
+    document.getElementById('ce_fact_C').dataset.sel = val==='C' ? '1' : '0';
     document.getElementById('ce_fact_A').style.borderColor = val==='A' ? '#A78BFA' : 'var(--border)';
     document.getElementById('ce_fact_C').style.borderColor = val==='C' ? '#A78BFA' : 'var(--border)';
-    ceRecalcular(); // recalcular al cambiar factura
+    ceRecalcular();
   }
 }
 
@@ -2235,21 +2270,22 @@ async function guardarCorreccion(id) {
   v.prestadorPatente  = g('ce_prestadorPatente').toUpperCase();
 
   // Dinero — recalcular desde base y movida
-  const base   = gn('ce_base');
-  const movida = gn('ce_movida');
-  const factA  = document.getElementById('ce_fact_A')?.style.borderColor.includes('A78BFA');
-  const iva    = factA ? Math.round(base * 0.21) : 0;
-  const total  = base + iva;
-  const neta   = Math.max(0, base - movida);
+  const base    = gn('ce_base');
+  const movida  = gn('ce_movida');
+  const factA   = ceGetFactura() === 'A';
+  const iva     = factA ? Math.round(base * 0.21) : 0;
+  const total   = base + iva;
+  const neta    = Math.max(0, base - movida);
+  const pctAvex = parseInt(document.getElementById('ce_slider')?.value || 40);
   v.factura        = factA ? 'A' : 'C';
   v.montoIva       = iva;
   v.montoMovida    = movida;
   v.total          = total;
-  v.montoAvex      = Math.round(neta * 0.4);
-  v.montoPrestador = Math.round(neta * 0.6);
+  v.montoAvex      = Math.round(neta * pctAvex / 100);
+  v.montoPrestador = Math.round(neta * (100 - pctAvex) / 100);
   v.km             = g('ce_km');
   v.zona           = g('ce_zona');
-  v.formaCobro     = document.getElementById('ce_cobro_ef')?.style.borderColor.includes('accent') ? 'efectivo' : 'transferencia';
+  v.formaCobro     = document.getElementById('ce_cobro_ef')?.dataset.sel === '1' ? 'efectivo' : 'transferencia';
 
   await guardarEnHistorial(v);
   const viajeActivo = _viajesActivosCache[id];
