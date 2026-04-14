@@ -2083,7 +2083,7 @@ function corregirViaje(id) {
         </div>
         ${campo('Origen', 'ce_origen', v.origen)}
         ${campo('Destino', 'ce_destino', v.destino)}
-      `, true)}
+      `, false)}
 
       ${seccion('🔧', 'Prestador', 'prestador', `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -3380,8 +3380,8 @@ function pRender() {
     ${navOrigen}
     <div class="p-card" style="overflow:hidden;"><div id="p-map" style="height:200px;"></div></div>
     <div class="p-total">
-      <div><div class="p-total-label">Total del servicio</div><div><span class="p-total-price">${fmt(v.total)}</span><span class="p-total-cur">ARS</span></div></div>
-      <div class="p-total-right"><div>Tu parte</div><div class="p-total-parte">${fmt((v.montoPrestador||0)+(v.montoMovida||0))}</div><div>Factura ${v.factura||'C'}</div></div>
+      <div><div class="p-total-label">Total del servicio</div><div><span class="p-total-price">${fmt(v.total-(v.montoIva||0))}</span><span class="p-total-cur">ARS</span></div></div>
+      <div class="p-total-right"><div>Tu parte</div><div class="p-total-parte">${fmt((v.montoPrestador||0)+(v.montoMovida||0))}</div><div>Sin IVA</div></div>
     </div>
     <div class="p-card"><div class="p-card-title">Estado del viaje</div><div class="p-tl">${tlHtml}</div></div>
     ${fotosHtml}
