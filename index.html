@@ -2034,60 +2034,115 @@ function corregirViaje(id) {
 
   const iStyle = 'width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:13px;padding:9px 12px;border-radius:6px;outline:none;box-sizing:border-box;font-family:Inter,sans-serif;';
   const lStyle = 'font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;';
+  const secStyle = 'border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+  const secHeaderStyle = 'display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;user-select:none;background:var(--surface2);';
+  const secTitleStyle = 'font-size:12px;font-weight:700;color:var(--text);';
+  const secBodyStyle = 'padding:14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--border);';
 
-  function campo(label, inputId, valor, tipo='text') {
-    return `<div><label style="${lStyle}">${label}</label><input id="${inputId}" type="${tipo}" value="${valor||''}" style="${iStyle}"></div>`;
+  function campo(label, inputId, valor, tipo='text', extra='') {
+    return `<div><label style="${lStyle}">${label}</label><input id="${inputId}" type="${tipo}" value="${(valor||'').toString().replace(/"/g,'&quot;')}" style="${iStyle}" ${extra}></div>`;
+  }
+
+  function seccion(icono, titulo, idSec, contenido, abierto=false) {
+    return `
+    <div style="${secStyle}">
+      <div style="${secHeaderStyle}" onclick="ceToggle('${idSec}')">
+        <div style="${secTitleStyle}">${icono} ${titulo}</div>
+        <span id="ce_arr_${idSec}" style="font-size:12px;color:var(--muted);transition:transform .2s;display:inline-block;transform:${abierto?'rotate(180deg)':'rotate(0deg)'}">▼</span>
+      </div>
+      <div id="ce_body_${idSec}" style="${secBodyStyle}display:${abierto?'flex':'none'}">
+        ${contenido}
+      </div>
+    </div>`;
   }
 
   const overlay = document.createElement('div');
   overlay.id = 'modalCorreccion';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:10000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;';
 
   overlay.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;width:100%;max-width:460px;display:flex;flex-direction:column;gap:14px;">
-      <div style="font-size:15px;font-weight:700;color:var(--text);">✏️ Corregir viaje <span style="font-size:11px;color:var(--muted);font-weight:400;">${v.id}</span></div>
-
-      ${campo('Fecha y hora', 'ce_fecha', v.createdAt ? new Date(v.createdAt).toISOString().slice(0,16) : '', 'datetime-local')}
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        ${campo('Cliente', 'ce_cliente', v.cliente)}
-        ${campo('Teléfono', 'ce_tel', v.clienteTel)}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        ${campo('Vehículo', 'ce_vehiculo', v.vehiculoCliente)}
-        ${campo('Patente', 'ce_patente', v.patenteCliente)}
-      </div>
-      ${campo('Origen', 'ce_origen', v.origen)}
-      ${campo('Destino', 'ce_destino', v.destino)}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        ${campo('Prestador', 'ce_prestador', v.prestadorNombre)}
-        ${campo('Tel. prestador', 'ce_prestadorTel', v.prestadorTel)}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-        ${campo('Distancia (km)', 'ce_km', v.km, 'number')}
-        ${campo('Total cobrado $', 'ce_total', v.total, 'number')}
-        ${campo('Zona', 'ce_zona', v.zona)}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        ${campo('AVEX 40% $', 'ce_avex', v.montoAvex, 'number')}
-        ${campo('Prestador 60% $', 'ce_prest', v.montoPrestador, 'number')}
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;width:100%;max-width:480px;display:flex;flex-direction:column;gap:10px;margin:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:15px;font-weight:700;color:var(--text);">✏️ Corregir viaje <span style="font-size:11px;color:var(--muted);font-weight:400;">${v.id}</span></div>
+        <button onclick="document.getElementById('modalCorreccion').remove()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;">✕</button>
       </div>
 
-      <div>
-        <label style="${lStyle}">Forma de cobro</label>
-        <div style="display:flex;gap:8px;">
-          <div id="ce_cobro_ef" data-val="efectivo" onclick="ceSel('cobro','ef')" style="flex:1;border:2px solid ${v.formaCobro==='efectivo'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">💵 Efectivo</div>
-          <div id="ce_cobro_tr" data-val="transferencia" onclick="ceSel('cobro','tr')" style="flex:1;border:2px solid ${v.formaCobro==='transferencia'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">🏦 Transferencia</div>
+      ${seccion('📅', 'Fecha y hora', 'fecha',
+        campo('Fecha y hora', 'ce_fecha', v.createdAt ? new Date(v.createdAt).toISOString().slice(0,16) : '', 'datetime-local'),
+        false
+      )}
+
+      ${seccion('👤', 'Cliente y vehículo', 'cliente', `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${campo('Cliente', 'ce_cliente', v.cliente)}
+          ${campo('Teléfono', 'ce_tel', v.clienteTel)}
         </div>
-      </div>
-
-      <div>
-        <label style="${lStyle}">Tipo de factura</label>
-        <div style="display:flex;gap:8px;">
-          <div id="ce_fact_A" data-val="A" onclick="ceSel('fact','A')" style="flex:1;border:2px solid ${v.factura==='A'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura A · +IVA</div>
-          <div id="ce_fact_C" data-val="C" onclick="ceSel('fact','C')" style="flex:1;border:2px solid ${v.factura==='C'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura C · sin IVA</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${campo('Vehículo', 'ce_vehiculo', v.vehiculoCliente)}
+          ${campo('Patente', 'ce_patente', v.patenteCliente)}
         </div>
-      </div>
+        ${campo('Origen', 'ce_origen', v.origen)}
+        ${campo('Destino', 'ce_destino', v.destino)}
+      `, true)}
+
+      ${seccion('🔧', 'Prestador', 'prestador', `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${campo('Nombre', 'ce_prestador', v.prestadorNombre)}
+          ${campo('Teléfono', 'ce_prestadorTel', v.prestadorTel)}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${campo('Vehículo prestador', 'ce_prestadorVehiculo', v.prestadorVehiculo)}
+          ${campo('Patente prestador', 'ce_prestadorPatente', v.prestadorPatente)}
+        </div>
+      `, false)}
+
+      ${seccion('💰', 'Dinero', 'dinero', `
+        <div style="font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:8px 10px;">
+          ⚡ Al modificar <strong>Tarifa base</strong> o <strong>Movida</strong> se recalcula todo automáticamente.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${campo('Tarifa base $', 'ce_base', v.montoMovida ? Math.round((v.montoPrestador+v.montoAvex)/(1)) : (v.total - (v.montoIva||0)), 'number')}
+          ${campo('Movida prestador $', 'ce_movida', v.montoMovida||0, 'number')}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${campo('IVA $', 'ce_iva', v.montoIva||0, 'number')}
+          ${campo('Distancia (km)', 'ce_km', v.km, 'number')}
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:10px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Resultado</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Total cliente</div>
+              <div id="ce_res_total" style="font-size:14px;font-weight:700;color:var(--text);">—</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">AVEX 40%</div>
+              <div id="ce_res_avex" style="font-size:14px;font-weight:700;color:var(--blue);">—</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Prestador 60%</div>
+              <div id="ce_res_prest" style="font-size:14px;font-weight:700;color:var(--accent);">—</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label style="${lStyle}">Forma de cobro</label>
+          <div style="display:flex;gap:8px;">
+            <div id="ce_cobro_ef" onclick="ceSel('cobro','ef')" style="flex:1;border:2px solid ${v.formaCobro==='efectivo'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">💵 Efectivo</div>
+            <div id="ce_cobro_tr" onclick="ceSel('cobro','tr')" style="flex:1;border:2px solid ${v.formaCobro==='transferencia'?'var(--accent)':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">🏦 Transferencia</div>
+          </div>
+        </div>
+        <div>
+          <label style="${lStyle}">Tipo de factura</label>
+          <div style="display:flex;gap:8px;">
+            <div id="ce_fact_A" onclick="ceSel('fact','A')" style="flex:1;border:2px solid ${v.factura==='A'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura A · +IVA</div>
+            <div id="ce_fact_C" onclick="ceSel('fact','C')" style="flex:1;border:2px solid ${v.factura==='C'?'#A78BFA':'var(--border)'};border-radius:6px;padding:9px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;">Factura C · sin IVA</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${campo('Zona', 'ce_zona', v.zona)}
+        </div>
+      `, false)}
 
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
         <button onclick="document.getElementById('modalCorreccion').remove()" style="padding:9px 16px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:Inter,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">Cancelar</button>
@@ -2096,6 +2151,51 @@ function corregirViaje(id) {
     </div>`;
 
   document.body.appendChild(overlay);
+
+  // Calcular tarifa base correctamente
+  const facturaActiva = v.factura || 'C';
+  const movida = v.montoMovida || 0;
+  let base;
+  if (facturaActiva === 'A') {
+    base = Math.round(v.total / 1.21);
+  } else {
+    base = v.total || 0;
+  }
+  document.getElementById('ce_base').value = base;
+  document.getElementById('ce_iva').value = v.montoIva || 0;
+
+  // Listeners para recalcular
+  ['ce_base','ce_movida','ce_iva'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', ceRecalcular);
+  });
+  ceRecalcular();
+}
+
+function ceToggle(sec) {
+  const body = document.getElementById('ce_body_' + sec);
+  const arr  = document.getElementById('ce_arr_' + sec);
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'flex';
+  arr.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function ceRecalcular() {
+  const base   = parseFloat(document.getElementById('ce_base')?.value) || 0;
+  const movida = parseFloat(document.getElementById('ce_movida')?.value) || 0;
+  const factA  = document.getElementById('ce_fact_A')?.style.borderColor.includes('A78BFA');
+  const iva    = factA ? Math.round(base * 0.21) : 0;
+  const total  = base + iva;
+  const neta   = Math.max(0, base - movida);
+  const avex   = Math.round(neta * 0.4);
+  const prest  = Math.round(neta * 0.6);
+  // Actualizar IVA automáticamente si es factura A
+  const ivaEl = document.getElementById('ce_iva');
+  if (ivaEl) ivaEl.value = iva;
+  // Mostrar resultado
+  const r = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = fmt(val); };
+  r('ce_res_total', total);
+  r('ce_res_avex', avex);
+  r('ce_res_prest', prest);
 }
 
 function ceSel(tipo, val) {
@@ -2105,6 +2205,7 @@ function ceSel(tipo, val) {
   } else {
     document.getElementById('ce_fact_A').style.borderColor = val==='A' ? '#A78BFA' : 'var(--border)';
     document.getElementById('ce_fact_C').style.borderColor = val==='C' ? '#A78BFA' : 'var(--border)';
+    ceRecalcular(); // recalcular al cambiar factura
   }
 }
 
@@ -2112,33 +2213,49 @@ async function guardarCorreccion(id) {
   const v = getHistorial().find(x => x.id === id);
   if (!v) return;
 
-  const g = (elId) => document.getElementById(elId)?.value.trim() || '';
+  const g  = (elId) => document.getElementById(elId)?.value.trim() || '';
   const gn = (elId) => parseFloat(document.getElementById(elId)?.value) || 0;
 
+  // Fecha
   const fechaVal = document.getElementById('ce_fecha')?.value;
   if (fechaVal) v.createdAt = new Date(fechaVal).getTime();
 
-  v.cliente         = g('ce_cliente');
-  v.clienteTel      = g('ce_tel');
-  v.vehiculoCliente = g('ce_vehiculo');
-  v.patenteCliente  = g('ce_patente').toUpperCase();
-  v.origen          = g('ce_origen');
-  v.destino         = g('ce_destino');
-  v.prestadorNombre = g('ce_prestador');
-  v.prestadorTel    = g('ce_prestadorTel');
-  v.km              = g('ce_km');
-  v.zona            = g('ce_zona');
-  v.total           = gn('ce_total');
-  v.montoAvex       = gn('ce_avex');
-  v.montoPrestador  = gn('ce_prest');
-  v.formaCobro      = document.getElementById('ce_cobro_ef').style.borderColor.includes('accent') || document.getElementById('ce_cobro_ef').style.borderColor === 'var(--accent)' ? 'efectivo' : 'transferencia';
-  v.factura         = document.getElementById('ce_fact_A').style.borderColor.includes('A78BFA') ? 'A' : 'C';
+  // Cliente y vehículo
+  v.cliente          = g('ce_cliente');
+  v.clienteTel       = g('ce_tel');
+  v.vehiculoCliente  = g('ce_vehiculo');
+  v.patenteCliente   = g('ce_patente').toUpperCase();
+  v.origen           = g('ce_origen');
+  v.destino          = g('ce_destino');
+
+  // Prestador
+  v.prestadorNombre   = g('ce_prestador');
+  v.prestadorTel      = g('ce_prestadorTel');
+  v.prestadorVehiculo = g('ce_prestadorVehiculo');
+  v.prestadorPatente  = g('ce_prestadorPatente').toUpperCase();
+
+  // Dinero — recalcular desde base y movida
+  const base   = gn('ce_base');
+  const movida = gn('ce_movida');
+  const factA  = document.getElementById('ce_fact_A')?.style.borderColor.includes('A78BFA');
+  const iva    = factA ? Math.round(base * 0.21) : 0;
+  const total  = base + iva;
+  const neta   = Math.max(0, base - movida);
+  v.factura        = factA ? 'A' : 'C';
+  v.montoIva       = iva;
+  v.montoMovida    = movida;
+  v.total          = total;
+  v.montoAvex      = Math.round(neta * 0.4);
+  v.montoPrestador = Math.round(neta * 0.6);
+  v.km             = g('ce_km');
+  v.zona           = g('ce_zona');
+  v.formaCobro     = document.getElementById('ce_cobro_ef')?.style.borderColor.includes('accent') ? 'efectivo' : 'transferencia';
 
   await guardarEnHistorial(v);
   const viajeActivo = _viajesActivosCache[id];
   if (viajeActivo) {
     Object.assign(viajeActivo, { cliente:v.cliente, clienteTel:v.clienteTel, origen:v.origen, destino:v.destino,
-      formaCobro:v.formaCobro, factura:v.factura, total:v.total, montoAvex:v.montoAvex, montoPrestador:v.montoPrestador });
+      formaCobro:v.formaCobro, factura:v.factura, total:v.total, montoAvex:v.montoAvex, montoPrestador:v.montoPrestador, montoMovida:v.montoMovida });
     await guardarViajeActivo(viajeActivo);
   }
 
