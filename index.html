@@ -1728,7 +1728,10 @@ let viajeActivoId=null, monitorInterval=null;
 async function confirmarViaje(){
   const d=window._presData;
   if(!d){alert('Primero calculá una ruta.');return;}
-  // Respetar tramo override igual que updateRevenue()
+  // Leer precio directamente desde lo que muestra la pantalla (fuente de verdad)
+  const totalEnPantalla = parseFloat(document.getElementById('rPrice').textContent.replace(/\./g,'').replace('$','')) || 0;
+  const precioBaseEnPantalla = parseFloat(document.getElementById('bBruta').textContent.replace(/\./g,'').replace(/[^0-9]/g,'')) || 0;
+  // También recalcular con overrides para los montos de reparto
   const tAuto=getTarifa(parseFloat(d.km));
   const idxAuto=TARIFAS.indexOf(tAuto);
   const idx=tramoOverride!==null?tramoOverride:idxAuto;
@@ -1738,6 +1741,7 @@ async function confirmarViaje(){
   const iva=facturaActual==='A'?precioBase*0.21:0;
   const total=precioBase+iva;
   const neta=Math.max(0,precioBase-movida);
+  console.log('[AVEX] confirmarViaje → precioBase:', precioBase, '| total:', total, '| pantalla:', totalEnPantalla, '| tramoOverride:', tramoOverride, '| precioOverride:', precioOverride);
   const viajeId='V'+Date.now().toString(36).toUpperCase();
   const viajeData={
     id:viajeId, estado:'pendiente', timestamps:{pendiente:Date.now()},
