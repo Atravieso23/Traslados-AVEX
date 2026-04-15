@@ -1760,11 +1760,11 @@ async function confirmarViaje(){
   const panel=document.getElementById('monitorPanel');
   panel.style.display='block';
   document.getElementById('monitorId').textContent=`ID: ${viajeId}`;
-  const dataB64=btoa(unescape(encodeURIComponent(JSON.stringify(viajeData))));
   const baseUrl=window.location.href.split('?')[0];
-  window._linkPrestador=`${baseUrl}?data=${dataB64}`;
+  window._linkPrestador=`${baseUrl}?viaje=${viajeId}`;
+  window._viajeData=viajeData;
   window._viajeId=viajeId;
-  document.getElementById('linkUrl').textContent=`${baseUrl}?data=... (listo para copiar)`;
+  document.getElementById('linkUrl').textContent=`${baseUrl}?viaje=${viajeId}`;
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
   iniciarMonitoreo(viajeId);
   actualizarContadorHistorial();
@@ -1829,14 +1829,28 @@ function mostrarComprobanteMonitor(v){
   document.getElementById('monitorComprobante').style.display='block';
 }
 
+function shortAddr(addr) {
+  if (!addr) return '—';
+  // Tomar solo la parte antes de la primera coma
+  return addr.split(',')[0].trim();
+}
+
+function buildLinkText(link, viaje) {
+  if (!viaje) return link;
+  const o = shortAddr(viaje.origen);
+  const d = shortAddr(viaje.destino);
+  return `🚗 Traslado | ${o} → ${d}\n${link}`;
+}
+
 function copiarLinkCalc(){
   const link=window._linkPrestador;
   if(!link)return;
-  navigator.clipboard.writeText(link).then(()=>{
+  const text = buildLinkText(link, window._viajeData);
+  navigator.clipboard.writeText(text).then(()=>{
     const btn=document.querySelector('.btn-copy');
     btn.innerHTML='✓';btn.style.color='var(--accent)';
     setTimeout(()=>{btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';btn.style.color='';},2000);
-  }).catch(()=>{const ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('Link copiado');});
+  }).catch(()=>{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('Link copiado');});
 }
 
 function compartirWA(){
@@ -2347,10 +2361,10 @@ async function copiarLink(id, btn){
   let v = await obtenerViajeActivo(id);
   if (!v) v = getHistorial().find(x => x.id === id);
   if(!v){alert('No se encontraron los datos del viaje.');return;}
-  const dataB64=btoa(unescape(encodeURIComponent(JSON.stringify(v))));
   const baseUrl=window.location.href.split('?')[0];
-  const link=`${baseUrl}?data=${dataB64}`;
-  await navigator.clipboard.writeText(link);
+  const link=`${baseUrl}?viaje=${id}`;
+  const text = buildLinkText(link, v);
+  await navigator.clipboard.writeText(text);
   const orig = btn.textContent;
   btn.textContent = '✓ Copiado';
   btn.style.borderColor = 'var(--accent)';
@@ -3496,7 +3510,32 @@ function pRender() {
 async function initModoPrestador() {
   try {
     const params = new URLSearchParams(window.location.search);
-    const data   = params.get('data');
+
+    // ── Formato nuevo: ?viaje=ID ──────────────────────────────
+    const viajeParam = params.get('viaje');
+    if (viajeParam) {
+      const { data: row } = await sb.from('viajes_activos').select('data').eq('viaje_id', viajeParam).single();
+      if (!row || !row.data) return false;
+      pViaje = row.data;
+      _viajesActivosCache[pViaje.id] = pViaje;
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('modoAvex').style.display = 'none';
+      document.getElementById('modoPrestador').classList.add('active');
+      document.title = 'AVEX · Viaje del Prestador';
+      pRender();
+      setInterval(async () => {
+        const { data: fresh } = await sb.from('viajes_activos').select('data').eq('viaje_id', pViaje.id).single();
+        if (fresh && fresh.data && fresh.data.estado !== pViaje.estado) {
+          pViaje = fresh.data;
+          _viajesActivosCache[pViaje.id] = pViaje;
+          pRender();
+        }
+      }, 3000);
+      return true;
+    }
+
+    // ── Formato viejo: ?data=BASE64 (compatibilidad) ──────────
+    const data = params.get('data');
     if (!data) return false;
     const v = JSON.parse(decodeURIComponent(escape(atob(data))));
     if (!v || !v.id) return false;
@@ -3504,18 +3543,14 @@ async function initModoPrestador() {
     document.getElementById('modoAvex').style.display = 'none';
     document.getElementById('modoPrestador').classList.add('active');
     document.title = 'AVEX · Viaje del Prestador';
-    // Intentar cargar versión más reciente desde Supabase
     const { data: row } = await sb.from('viajes_activos').select('data').eq('viaje_id', v.id).single();
-    // Siempre usar los precios del link (fuente de verdad), pero tomar estado y timestamps de Supabase
     const fromSupa = (row && row.data) ? row.data : null;
     pViaje = fromSupa
       ? { ...v, estado: fromSupa.estado, timestamps: fromSupa.timestamps, fotoOrigen: fromSupa.fotoOrigen, fotoDestino: fromSupa.fotoDestino, formaCobro: fromSupa.formaCobro }
       : v;
     _viajesActivosCache[pViaje.id] = pViaje;
-    // Si no existe en Supabase, guardar el del link
     if (!row) await guardarViajeActivo(pViaje);
     pRender();
-    // Polling cada 3s desde Supabase
     setInterval(async () => {
       const { data: fresh } = await sb.from('viajes_activos').select('data').eq('viaje_id', pViaje.id).single();
       if (fresh && fresh.data && fresh.data.estado !== pViaje.estado) {
