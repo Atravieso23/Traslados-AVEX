@@ -1728,8 +1728,12 @@ let viajeActivoId=null, monitorInterval=null;
 async function confirmarViaje(){
   const d=window._presData;
   if(!d){alert('Primero calculá una ruta.');return;}
-  const t=getTarifa(parseFloat(d.km));
-  const movida=MOVIDA[zonaActual].monto;
+  // Respetar tramo override igual que updateRevenue()
+  const tAuto=getTarifa(parseFloat(d.km));
+  const idxAuto=TARIFAS.indexOf(tAuto);
+  const idx=tramoOverride!==null?tramoOverride:idxAuto;
+  const t=TARIFAS[idx]||tAuto;
+  const movida=getMovida();
   const precioBase = precioOverride !== null ? precioOverride : t.precio;
   const iva=facturaActual==='A'?precioBase*0.21:0;
   const total=precioBase+iva;
