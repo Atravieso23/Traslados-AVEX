@@ -1831,21 +1831,16 @@ function mostrarComprobanteMonitor(v){
 
 function shortAddr(addr) {
   if (!addr) return '—';
-  // Tomar solo la parte antes de la primera coma
   return addr.split(',')[0].trim();
-}
-
-function buildLinkText(link, viaje) {
-  if (!viaje) return link;
-  const o = shortAddr(viaje.origen);
-  const d = shortAddr(viaje.destino);
-  return `🚗 Traslado | ${o} → ${d}\n${link}`;
 }
 
 function copiarLinkCalc(){
   const link=window._linkPrestador;
   if(!link)return;
-  const text = buildLinkText(link, window._viajeData);
+  const v=window._viajeData;
+  const o=v?shortAddr(v.origen):'';
+  const d=v?shortAddr(v.destino):'';
+  const text=(o&&d)?`🚗 Traslado | ${o} → ${d}\n${link}`:link;
   navigator.clipboard.writeText(text).then(()=>{
     const btn=document.querySelector('.btn-copy');
     btn.innerHTML='✓';btn.style.color='var(--accent)';
@@ -2363,7 +2358,8 @@ async function copiarLink(id, btn){
   if(!v){alert('No se encontraron los datos del viaje.');return;}
   const baseUrl=window.location.href.split('?')[0];
   const link=`${baseUrl}?viaje=${id}`;
-  const text = buildLinkText(link, v);
+  const o=shortAddr(v.origen), d=shortAddr(v.destino);
+  const text=`🚗 Traslado | ${o} → ${d}\n${link}`;
   await navigator.clipboard.writeText(text);
   const orig = btn.textContent;
   btn.textContent = '✓ Copiado';
