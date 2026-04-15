@@ -535,11 +535,11 @@ input::placeholder{color:#404040;}
 
 <!-- ── LOGIN ── -->
 <script>
-// Ocultar login inmediatamente si es link de prestador (sin esperar async)
+// Ocultar login Y app principal inmediatamente si es link de prestador
 (function(){
   const p = new URLSearchParams(window.location.search);
   if(p.get('viaje') || p.get('data')) {
-    document.write('<style>#loginScreen{display:none!important}</style>');
+    document.write('<style>#loginScreen,#modoAvex{display:none!important}</style>');
   }
 })();
 </script>
