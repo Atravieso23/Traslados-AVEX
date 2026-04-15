@@ -534,6 +534,15 @@ input::placeholder{color:#404040;}
 <body>
 
 <!-- ── LOGIN ── -->
+<script>
+// Ocultar login inmediatamente si es link de prestador (sin esperar async)
+(function(){
+  const p = new URLSearchParams(window.location.search);
+  if(p.get('viaje') || p.get('data')) {
+    document.write('<style>#loginScreen{display:none!important}</style>');
+  }
+})();
+</script>
 <div id="loginScreen">
   <div class="login-box">
     <img class="login-logo" src="https://avexargentina.com/logo_avex.png" alt="AVEX"
