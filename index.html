@@ -2415,10 +2415,15 @@ document.getElementById('modalOverlay').addEventListener('click',e=>{
 function abrirPresupuesto(){
   const d=window._presData;
   if(!d){alert('Primero calculá una ruta para generar el presupuesto.');return;}
-  const t=getTarifa(parseFloat(d.km));
-  const movida=MOVIDA[zonaActual].monto;
-  const iva=facturaActual==='A'?t.precio*0.21:0;
-  const total=t.precio+iva;
+  // Respetar tramo y precio override igual que updateRevenue()
+  const tAuto=getTarifa(parseFloat(d.km));
+  const idxAuto=TARIFAS.indexOf(tAuto);
+  const idx=tramoOverride!==null?tramoOverride:idxAuto;
+  const t=TARIFAS[idx]||tAuto;
+  const precioBase=precioOverride!==null?precioOverride:t.precio;
+  const movida=getMovida();
+  const iva=facturaActual==='A'?precioBase*0.21:0;
+  const total=precioBase+iva;
   const cliente=document.getElementById('clienteInput').value.trim()||'—';
   const tel=document.getElementById('telefonoInput').value.trim()||'—';
   const vehiculo=document.getElementById('vehiculoInput').value.trim()||'—';
@@ -2471,7 +2476,7 @@ function abrirPresupuesto(){
       <div class="pres-total-right"><div class="pres-total-tipo">${t.tipo}</div><div class="pres-total-fact">Factura ${facturaActual}${iva>0?' · IVA 21% incluido':' · Sin IVA'}</div></div>
     </div>
     <div class="pres-section"><div class="pres-sec-label">Detalle</div>
-      ${iva>0?`<div class="pres-detail-row"><span class="label">Tarifa base (sin IVA)</span><span class="value">${fmt(t.precio)}</span></div><div class="pres-detail-row"><span class="label">IVA 21%</span><span class="value">${fmt(iva)}</span></div>`:''}
+      ${iva>0?`<div class="pres-detail-row"><span class="label">Tarifa base (sin IVA)</span><span class="value">${fmt(precioBase)}</span></div><div class="pres-detail-row"><span class="label">IVA 21%</span><span class="value">${fmt(iva)}</span></div>`:''}
       <div class="pres-detail-row"><span class="label">Zona de operación</span><span class="value">${ZONA_NOMBRES[zonaActual]}</span></div>
       <div class="pres-detail-row"><span class="label">Tramo tarifario</span><span class="value">${t.label}</span></div>
       <div class="pres-detail-row" style="font-weight:700;"><span class="label">Total a cobrar</span><span class="value" style="color:#22C55E;font-size:15px;">${fmt(total)}</span></div>
