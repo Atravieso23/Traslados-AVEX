@@ -2200,7 +2200,7 @@ function corregirViaje(id) {
             <label style="${lStyle};margin:0;">% distribución</label>
             <span style="font-size:11px;color:var(--muted);">AVEX <span id="ce_pct_avex_lbl">40</span>% · Prestador <span id="ce_pct_prest_lbl">60</span>%</span>
           </div>
-          <input id="ce_slider" type="range" min="10" max="90" value="${Math.round((v.montoAvex/(v.montoAvex+v.montoPrestador||1))*100)||40}"
+          <input id="ce_slider" type="range" min="0" max="100" value="${Math.round((v.montoAvex/(v.montoAvex+v.montoPrestador||1))*100)||40}"
             oninput="ceSliderChange(this.value)"
             style="width:100%;accent-color:var(--accent);cursor:pointer;">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;">
@@ -2519,6 +2519,18 @@ function switchCalcTipo(tipo) {
     p.style.color = isActive ? 'var(--blue)' : 'var(--muted)';
     p.style.fontWeight = isActive ? '700' : '500';
   });
+  // Claims siempre Factura A; ocultar opción C
+  const factRow = document.querySelector('.factura-row');
+  const pillC = document.querySelector('.fact-pill[data-fact="C"]');
+  if (tipo === 'claims') {
+    // Forzar Factura A
+    document.querySelectorAll('.fact-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector('.fact-pill[data-fact="A"]')?.classList.add('active');
+    facturaActual = 'A';
+    if (pillC) pillC.style.display = 'none';
+  } else {
+    if (pillC) pillC.style.display = '';
+  }
   renderTabla(-1);
   // Si ya hay resultado visible, recalcular
   if (document.getElementById('resultWrap').classList.contains('visible') && window._presData) {
@@ -3379,6 +3391,14 @@ async function pConfirmarCobro() {
   await pGuardar(); await guardarEnHistorial(pViaje); pRender();
 }
 
+async function pConfirmarCobroClaims() {
+  pViaje.estado = 'completado';
+  pViaje.formaCobro = 'claims';
+  pViaje.timestamps = pViaje.timestamps || {};
+  pViaje.timestamps.completado = Date.now();
+  await pGuardar(); await guardarEnHistorial(pViaje); pRender();
+}
+
 function pRender() {
   const v = pViaje; if (!v) return;
   const PASOS = ['pendiente','en-camino','en-origen','en-destino','completado'];
@@ -3440,8 +3460,14 @@ function pRender() {
       </div>
     </div>` : '';
 
-  // Cobro
-  const cobroHtml = (v.estado === 'cobro' || v.estado === 'en-destino') ? `
+  // Cobro — Claims no tiene cobro al cliente (lo cubre el seguro)
+  const esClaims = v.tipoServicio === 'claims';
+  const cobroHtml = (v.estado === 'cobro' || v.estado === 'en-destino') ? (esClaims ? `
+    <div class="p-cobro-card">
+      <div class="p-cobro-title">Servicio Claims</div>
+      <div class="p-cobro-sub" style="margin-bottom:14px;">El pago lo gestiona el seguro. No hay cobro directo al cliente.</div>
+      <button class="p-btn-confirmar" style="display:block;" onclick="pConfirmarCobroClaims()">✅ Confirmar cierre del viaje</button>
+    </div>` : `
     <div class="p-cobro-card">
       <div class="p-cobro-title">¿Cómo se cobró el servicio?</div>
       <div class="p-cobro-sub">Seleccioná la forma de cobro para cerrar el viaje</div>
@@ -3458,14 +3484,14 @@ function pRender() {
         </div>
       </div>
       <button class="p-btn-confirmar" style="display:${pCobroSel?'block':'none'};" onclick="pConfirmarCobro()">✅ Confirmar y cerrar viaje</button>
-    </div>` : '';
+    </div>`) : '';
 
   // Completado
   const doneHtml = v.estado === 'completado' ? `
     <div class="p-card" style="text-align:center;padding:32px 20px;">
       <div style="font-size:48px;margin-bottom:12px;">✅</div>
       <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;">Viaje completado</div>
-      <div style="font-size:13px;color:var(--muted);">${v.formaCobro === 'efectivo' ? '💵 Cobrado en efectivo' : '🏦 Transferencia a AVEX'}</div>
+      <div style="font-size:13px;color:var(--muted);">${v.formaCobro === 'efectivo' ? '💵 Cobrado en efectivo' : v.formaCobro === 'claims' ? '📋 Pago por seguro (Claims)' : '🏦 Transferencia a AVEX'}</div>
     </div>` : '';
 
   document.getElementById('pContent').innerHTML = `
