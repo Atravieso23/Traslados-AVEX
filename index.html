@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 :root {
   --black:#0B0B0B; --surface:#141414; --surface2:#1C1C1C; --surface3:#222;
@@ -2008,7 +2009,7 @@ function renderHistorial(){
         </div>
         <div class="hist-actions">
           <button class="hist-btn" onclick="copiarLink('${v.id}', this)">🔗 Copiar link</button>
-          <button class="hist-btn" onclick="descargarDesglose('${v.id}')" style="border-color:#25D366;color:#25D366;">📤 Desglose WA</button>
+          <button class="hist-btn" onclick="descargarDesglose('${v.id}')" style="border-color:#25D366;color:#25D366;">📄 Desglose PDF</button>
           <button class="hist-btn" onclick="corregirViaje('${v.id}')" style="border-color:var(--blue);color:var(--blue);">✏️ Corregir</button>
           <button class="hist-btn danger" onclick="eliminarViaje('${v.id}')">🗑 Eliminar</button>
           ${rolActual === 'admin@avex.com' ? `
@@ -2401,49 +2402,108 @@ async function descargarDesglose(id) {
   if (!v) v = getHistorial().find(x => x.id === id);
   if (!v) { alert('No se encontraron los datos del viaje.'); return; }
 
-  const fmtW = n => '$' + Math.round(n).toLocaleString('es-AR');
-  const baseReal  = (v.total || 0) - (v.montoIva || 0);
-  const neta      = (v.montoPrestador || 0) + (v.montoAvex || 0);
-  const hayIva    = (v.montoIva || 0) > 0;
-  const hayMovida = (v.montoMovida || 0) > 0;
-  const fecha     = v.createdAt
-    ? new Date(v.createdAt).toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})
+  const fmtP    = n => '$\u00a0' + Math.round(n).toLocaleString('es-AR');
+  const baseReal = (v.total || 0) - (v.montoIva || 0);
+  const neta     = (v.montoPrestador || 0) + (v.montoAvex || 0);
+  const hayIva   = (v.montoIva || 0) > 0;
+  const hayMov   = (v.montoMovida || 0) > 0;
+  const fecha    = v.createdAt
+    ? new Date(v.createdAt).toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})
     : '—';
-
-  // Nombre del archivo / encabezado del mensaje
   const vehiculo  = v.vehiculoCliente || v.prestadorVehiculo || '';
   const patente   = v.patenteCliente  || v.prestadorPatente  || '';
   const nombreVeh = [vehiculo, patente].filter(Boolean).join(' - ');
-  const titulo    = `📄 Desglose${nombreVeh ? ' · ' + nombreVeh : ''}`;
+  const filename  = `Desglose${nombreVeh ? ' ' + nombreVeh : ' ' + v.id}.pdf`;
 
-  const sep = '─────────────────────';
+  // ── HTML del PDF (colores hardcodeados, sin CSS vars) ──────────
+  const brow = (bg, name, desc, amount, color, barColor, barPct) => `
+    <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:11px 20px;border-bottom:1px solid #e9ecef;background:${bg};gap:12px;">
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:13px;font-weight:500;color:#111827;">${name}</span>
+        <span style="font-size:11px;color:#6B7280;">${desc}</span>
+        ${barColor ? `<div style="margin-top:5px;height:4px;background:#dee2e6;border-radius:2px;overflow:hidden;"><div style="width:${barPct}%;height:100%;background:${barColor};border-radius:2px;"></div></div>` : ''}
+      </div>
+      <span style="font-size:16px;font-weight:600;text-align:right;white-space:nowrap;color:${color};">${amount}</span>
+    </div>`;
 
-  const msg = [
-    titulo,
-    '',
-    `🗓 ${fecha}  |  ${v.id}`,
-    `📍 ${shortAddr(v.origen)} → ${shortAddr(v.destino)}`,
-    `👤 ${v.cliente || '—'}   |   👨‍🔧 ${v.prestadorNombre || '—'}`,
-    `📏 ${v.km} km · ${v.zona || '—'} · Fact. ${v.factura || 'C'}`,
-    v.tipoServicio && v.tipoServicio !== 'particular'
-      ? `🏢 Tipo: ${getTipoLabel(v.tipoServicio)}`
-      : null,
-    '',
-    sep,
-    `💰 *DESGLOSE DE REVENUE*`,
-    sep,
-    `Tarifa base:       ${fmtW(baseReal)}`,
-    hayIva   ? `IVA 21%:           + ${fmtW(v.montoIva)}`   : null,
-    `Total al cliente:  *${fmtW(v.total)}*`,
-    hayMovida ? `Movida:            − ${fmtW(v.montoMovida)}` : null,
-    `Base neta:         ${fmtW(neta)}`,
-    sep,
-    `🟢 Prestador 60%:  *${fmtW(v.montoPrestador || 0)}*`,
-    `🔵 AVEX 40%:       ${fmtW(v.montoAvex || 0)}`,
-    sep,
-  ].filter(l => l !== null).join('\n');
+  const htmlContent = `
+    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;max-width:520px;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+      <div style="background:#0B0B0B;padding:22px 24px;display:flex;align-items:center;">
+        <div>
+          <div style="font-size:20px;font-weight:900;letter-spacing:3px;color:#F59E0B;">AVEX</div>
+          <div style="font-size:10px;color:#9CA3AF;letter-spacing:1px;text-transform:uppercase;margin-top:3px;">Desglose de revenue</div>
+        </div>
+        <div style="margin-left:auto;text-align:right;">
+          <div style="font-size:12px;color:#F59E0B;font-weight:700;">${nombreVeh || v.id}</div>
+          <div style="font-size:10px;color:#6B7280;margin-top:3px;">${fecha}</div>
+        </div>
+      </div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6B7280;padding:14px 20px 8px;border-bottom:1px solid #e9ecef;">Datos del viaje</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 20px 14px;">
+        <div style="grid-column:1/-1;background:#f8f9fa;border-radius:7px;padding:9px 12px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9CA3AF;margin-bottom:3px;">Ruta</div>
+          <div style="font-size:12px;font-weight:600;color:#111827;">${shortAddr(v.origen)} → ${shortAddr(v.destino)}</div>
+        </div>
+        ${[
+          ['Cliente',   v.cliente||'—'],
+          ['Prestador', v.prestadorNombre||'—'],
+          ['Distancia', v.km+' km'],
+          ['Zona',      v.zona||'—'],
+          ['Tipo',      getTipoLabel(v.tipoServicio||'particular')],
+          ['Factura',   'Tipo '+(v.factura||'C')],
+        ].map(([l,val])=>`<div style="background:#f8f9fa;border-radius:7px;padding:9px 12px;"><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9CA3AF;margin-bottom:3px;">${l}</div><div style="font-size:12px;font-weight:600;color:#111827;">${val}</div></div>`).join('')}
+      </div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6B7280;padding:14px 20px 8px;border-top:1px solid #e9ecef;border-bottom:1px solid #e9ecef;">Desglose de revenue</div>
+      ${brow('#f8f9fa','Tarifa base','Precio del servicio sin impuestos',fmtP(baseReal),'#111827')}
+      ${hayIva ? brow('#f5f3ff','+ IVA 21%','Factura A — se cobra al cliente','+ '+fmtP(v.montoIva),'#7C3AED') : ''}
+      ${brow('#f1f3f5','Total al cliente',hayIva?'Tarifa + IVA 21%':'Sin IVA (Factura C)',fmtP(v.total),'#111827')}
+      ${hayMov ? brow('#fffbeb','− Movida del prestador',v.zona||'','− '+fmtP(v.montoMovida),'#D97706') : ''}
+      ${brow('#f8f9fa','Base neta','Sobre esta se divide el revenue',fmtP(neta),'#111827')}
+      ${brow('#f0fdf4','Prestador · 60%','Su ganancia por el servicio',fmtP(v.montoPrestador||0),'#16A34A','#22C55E',60)}
+      ${brow('#eff6ff','AVEX · 40%','Revenue de la plataforma',fmtP(v.montoAvex||0),'#2563EB','#3B82F6',40)}
+      <div style="padding:12px 20px;font-size:10px;color:#9CA3AF;text-align:center;border-top:1px solid #e9ecef;background:#f8f9fa;">
+        Generado por AVEX Traslados · ${new Date().toLocaleDateString('es-AR')}
+      </div>
+    </div>`;
 
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  // ── Generar PDF con html2pdf ───────────────────────────────────
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:560px;background:#fff;';
+  container.innerHTML = htmlContent;
+  document.body.appendChild(container);
+
+  try {
+    const pdfBlob = await html2pdf()
+      .set({
+        margin: [8, 10],
+        filename,
+        image: { type: 'jpeg', quality: 0.97 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: 'avoid-all' },
+      })
+      .from(container)
+      .outputPdf('blob');
+
+    document.body.removeChild(container);
+
+    const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+    // En móvil: Web Share API → el usuario elige WhatsApp
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+    } else {
+      // Desktop: descarga el PDF directamente
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    }
+  } catch(e) {
+    if (container.parentNode) document.body.removeChild(container);
+    console.error('Error generando PDF:', e);
+    alert('No se pudo generar el PDF. Intentá de nuevo.');
+  }
 }
 
 async function eliminarViaje(id){
