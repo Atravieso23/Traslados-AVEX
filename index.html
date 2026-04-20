@@ -639,16 +639,7 @@ input::placeholder{color:#404040;}
     </div>
 
     <div class="sec-tag" style="margin-top:4px;">02 — Tipo de servicio</div>
-    <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <button class="calc-tipo-pill" data-tipo="particular" onclick="switchCalcTipo('particular')"
-        style="padding:7px 22px;border-radius:20px;border:1px solid var(--blue);background:rgba(59,130,246,.15);color:var(--blue);font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .18s;">
-        🚗 Particular
-      </button>
-      <button class="calc-tipo-pill" data-tipo="claims" onclick="switchCalcTipo('claims')"
-        style="padding:7px 22px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all .18s;">
-        📋 Claims
-      </button>
-    </div>
+    <div id="calcTipoPills" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
 
     <div class="sec-tag" style="margin-top:4px;">03 — Tipo de factura</div>
     <div class="factura-row">
@@ -933,17 +924,8 @@ input::placeholder{color:#404040;}
     </div>
   </div>
 
-  <!-- Selector de tipo de tarifario -->
-  <div style="display:flex;gap:8px;margin-bottom:18px;">
-    <button class="tarifa-tipo-pill" data-tipo="particular" onclick="switchTarifaTipo('particular')"
-      style="padding:9px 28px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .18s;">
-      🚗 Particular
-    </button>
-    <button class="tarifa-tipo-pill" data-tipo="claims" onclick="switchTarifaTipo('claims')"
-      style="padding:9px 28px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .18s;">
-      📋 Claims
-    </button>
-  </div>
+  <!-- Selector de tipo de tarifario (dinámico) -->
+  <div id="tarifaTipoPills" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;"></div>
   <div class="card" style="margin-bottom:16px;">
     <div class="sec-tag" style="padding:14px 18px 0;">Tramos por distancia</div>
     <div style="padding:14px 18px;">
@@ -1087,7 +1069,7 @@ const MOVIDA_DEFAULT = {
   norte_lejano:  {nombre:'Pilar / Tigre',                 monto:20000, activa:true},
 };
 // Tipo activo en el editor de tarifario y en la calculadora
-let tarifaTipo = 'particular'; // 'particular' | 'claims'
+let tarifaTipo = 'particular'; // clave del tipo activo en el editor
 let calcTipo   = 'particular';
 
 function parsearTarifas(raw, defaults) {
@@ -1117,6 +1099,34 @@ function cargarTarifario() {
   } catch(e) { return { tarifas: TARIFAS_DEFAULT.map(t=>({...t})), movidas: MOVIDA_DEFAULT }; }
 }
 let { tarifas: TARIFAS, movidas: MOVIDA } = cargarTarifario();
+
+// ── TIPOS DE TARIFARIO (extensible) ─────────────────────────────
+const TIPOS_DEFAULT = [
+  { key: 'particular', label: 'Particular', emoji: '🚗' },
+  { key: 'la-caja',   label: 'La Caja',    emoji: '📋' }
+];
+function getTiposTarifario() {
+  try {
+    const raw = localStorage.getItem('avex-tipos-tarifario');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  saveTiposTarifario(TIPOS_DEFAULT);
+  return TIPOS_DEFAULT.map(t => ({...t}));
+}
+function saveTiposTarifario(tipos) {
+  localStorage.setItem('avex-tipos-tarifario', JSON.stringify(tipos));
+}
+function getTipoLabel(key) {
+  // backward compat: viajes viejos guardados con tipoServicio='claims'
+  if (key === 'claims') return 'La Caja';
+  const t = getTiposTarifario().find(t => t.key === key);
+  return t ? t.label : (key || 'Particular');
+}
+function getTipoEmoji(key) {
+  if (key === 'claims') return '📋';
+  const t = getTiposTarifario().find(t => t.key === key);
+  return t ? t.emoji : '📋';
+}
 Object.keys(MOVIDA).forEach(k => {
   if (MOVIDA[k].activa === undefined) MOVIDA[k].activa = true;
   if (!MOVIDA[k].nombre) MOVIDA[k].nombre = MOVIDA[k].label?.replace(/\$[\d.,]+ \(/,'').replace(/\)/,'').trim() || k;
@@ -1977,7 +1987,7 @@ function renderHistorial(){
     <div class="hist-viaje" id="hv-${v.id}">
       <div class="hist-viaje-header" onclick="toggleHistViaje('${v.id}')">
         <div style="flex:1;">
-          <div class="hist-viaje-id">${v.id} · ${fecha}${v.tipoServicio==='claims'?' · <span style="color:var(--blue);font-weight:700;">Claims</span>':''}</div>
+          <div class="hist-viaje-id">${v.id} · ${fecha}${v.tipoServicio && v.tipoServicio!=='particular'?' · <span style="color:var(--blue);font-weight:700;">${getTipoLabel(v.tipoServicio)}</span>':''}</div>
           <div class="hist-viaje-ruta">${v.origen.split(',')[0]} <span>→</span> ${v.destino.split(',')[0]}</div>
         </div>
         <div class="hist-estado-badge ${v.estado}">${v.estado==='completado'?'✓ Completado':v.estado.replace('-',' ')}</div>
@@ -2456,7 +2466,7 @@ async function descargarDesglose(id) {
     <div class="info-cell"><div class="info-label">Prestador</div><div class="info-value">${v.prestadorNombre||'—'}</div></div>
     <div class="info-cell"><div class="info-label">Distancia</div><div class="info-value">${v.km} km</div></div>
     <div class="info-cell"><div class="info-label">Zona</div><div class="info-value">${v.zona||'—'}</div></div>
-    <div class="info-cell"><div class="info-label">Tipo servicio</div><div class="info-value">${v.tipoServicio==='claims'?'Claims':'Particular'}</div></div>
+    <div class="info-cell"><div class="info-label">Tipo servicio</div><div class="info-value">${getTipoLabel(v.tipoServicio||'particular')}</div></div>
     <div class="info-cell"><div class="info-label">Factura</div><div class="info-value">Tipo ${v.factura||'C'}</div></div>
   </div>
 
@@ -2590,18 +2600,76 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')cerrarPresupuesto();
 
 // ── TARIFARIO EDITOR ──────────────────────────────────────────
 
+// ── RENDER PILLS DINÁMICOS ───────────────────────────────────────
+function renderTarifaTipoPills() {
+  const container = document.getElementById('tarifaTipoPills');
+  if (!container) return;
+  const tipos = getTiposTarifario();
+  container.innerHTML = tipos.map(t => {
+    const act = tarifaTipo === t.key;
+    const canDel = t.key !== 'particular';
+    return `<div style="display:flex;align-items:center;gap:0;">
+      <button class="tarifa-tipo-pill" data-tipo="${t.key}" onclick="switchTarifaTipo('${t.key}')"
+        style="padding:9px ${canDel?'12px':'22px'} 9px 22px;border-radius:${canDel?'20px 0 0 20px':'20px'};border:1px solid ${act?'var(--accent)':'var(--border)'};border-right:${canDel?'none':'1px solid '+(act?'var(--accent)':'var(--border)')};background:${act?'var(--accent-dim)':'var(--surface2)'};color:${act?'var(--accent)':'var(--muted)'};font-family:'Inter',sans-serif;font-size:13px;font-weight:${act?'700':'500'};cursor:pointer;transition:all .18s;white-space:nowrap;">
+        ${t.emoji} ${t.label}
+      </button>
+      ${canDel ? `<button onclick="eliminarTipoTarifario('${t.key}')" title="Eliminar"
+        style="padding:9px 10px;border-radius:0 20px 20px 0;border:1px solid ${act?'var(--accent)':'var(--border)'};border-left:1px solid ${act?'var(--accent-dim)':'var(--border)'};background:${act?'var(--accent-dim)':'var(--surface2)'};color:${act?'var(--accent)':'var(--muted)'};font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;transition:all .18s;line-height:1;">×</button>` : ''}
+    </div>`;
+  }).join('') + `
+    <button onclick="agregarTipoTarifario()"
+      style="padding:9px 16px;border-radius:20px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:18px;font-weight:300;cursor:pointer;transition:all .18s;line-height:1;"
+      onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+</button>`;
+}
+
+function renderCalcTipoPills() {
+  const container = document.getElementById('calcTipoPills');
+  if (!container) return;
+  const tipos = getTiposTarifario();
+  container.innerHTML = tipos.map(t => {
+    const act = calcTipo === t.key;
+    return `<button class="calc-tipo-pill" data-tipo="${t.key}" onclick="switchCalcTipo('${t.key}')"
+      style="padding:7px 22px;border-radius:20px;border:1px solid ${act?'var(--blue)':'var(--border)'};background:${act?'rgba(59,130,246,.15)':'var(--surface2)'};color:${act?'var(--blue)':'var(--muted)'};font-family:'Inter',sans-serif;font-size:12px;font-weight:${act?'700':'500'};cursor:pointer;transition:all .18s;white-space:nowrap;">
+      ${t.emoji} ${t.label}
+    </button>`;
+  }).join('');
+}
+
+function agregarTipoTarifario() {
+  const label = prompt('Nombre del tipo de servicio (ej: "Provincia", "GBA"):');
+  if (!label || !label.trim()) return;
+  const tipos = getTiposTarifario();
+  const key = label.trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  if (!key) { alert('Nombre inválido.'); return; }
+  if (tipos.find(t => t.key === key)) { alert('Ya existe un tipo con ese nombre.'); return; }
+  tipos.push({ key, label: label.trim(), emoji: '📋' });
+  saveTiposTarifario(tipos);
+  renderTarifaTipoPills();
+  renderCalcTipoPills();
+}
+
+function eliminarTipoTarifario(key) {
+  if (key === 'particular') return;
+  const label = getTipoLabel(key);
+  if (!confirm(`¿Eliminar el tipo "${label}"? Se borrará su tarifario guardado.`)) return;
+  const tipos = getTiposTarifario().filter(t => t.key !== key);
+  saveTiposTarifario(tipos);
+  localStorage.removeItem(`avex-tarifas-${key}`);
+  if (tarifaTipo === key) switchTarifaTipo('particular');
+  else renderTarifaTipoPills();
+  if (calcTipo === key) switchCalcTipo('particular');
+  else renderCalcTipoPills();
+}
+
 // Cambiar tipo activo en el EDITOR de tarifario
 function switchTarifaTipo(tipo) {
   tarifaTipo = tipo;
   TARIFAS.length = 0;
   cargarTarifas(tipo).forEach(t => TARIFAS.push(t));
-  document.querySelectorAll('.tarifa-tipo-pill').forEach(p => {
-    const isActive = p.dataset.tipo === tipo;
-    p.style.background = isActive ? 'var(--accent-dim)' : 'var(--surface2)';
-    p.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
-    p.style.color = isActive ? 'var(--accent)' : 'var(--muted)';
-    p.style.fontWeight = isActive ? '700' : '500';
-  });
+  renderTarifaTipoPills();
   renderFilasTarifas(); renderPreviewTarifario();
 }
 
@@ -2610,18 +2678,10 @@ function switchCalcTipo(tipo) {
   calcTipo = tipo;
   TARIFAS.length = 0;
   cargarTarifas(tipo).forEach(t => TARIFAS.push(t));
-  document.querySelectorAll('.calc-tipo-pill').forEach(p => {
-    const isActive = p.dataset.tipo === tipo;
-    p.style.background = isActive ? 'rgba(59,130,246,.15)' : 'var(--surface2)';
-    p.style.borderColor = isActive ? 'var(--blue)' : 'var(--border)';
-    p.style.color = isActive ? 'var(--blue)' : 'var(--muted)';
-    p.style.fontWeight = isActive ? '700' : '500';
-  });
-  // Claims siempre Factura A; ocultar opción C
-  const factRow = document.querySelector('.factura-row');
+  renderCalcTipoPills();
+  // Todo tipo que no sea 'particular' → Factura A obligatoria
   const pillC = document.querySelector('.fact-pill[data-fact="C"]');
-  if (tipo === 'claims') {
-    // Forzar Factura A
+  if (tipo !== 'particular') {
     document.querySelectorAll('.fact-pill').forEach(p => p.classList.remove('active'));
     document.querySelector('.fact-pill[data-fact="A"]')?.classList.add('active');
     facturaActual = 'A';
@@ -2630,14 +2690,13 @@ function switchCalcTipo(tipo) {
     if (pillC) pillC.style.display = '';
   }
   renderTabla(-1);
-  // Si ya hay resultado visible, recalcular
   if (document.getElementById('resultWrap').classList.contains('visible') && window._presData) {
     updateRevenue(parseFloat(window._presData.km));
   }
 }
 
 function resetearTarifario(){
-  if(!confirm(`¿Restaurar el tarifario "${tarifaTipo === 'particular' ? 'Particular' : 'Claims'}" a los valores por defecto?`))return;
+  if(!confirm(`¿Restaurar el tarifario "${getTipoLabel(tarifaTipo)}" a los valores por defecto?`))return;
   localStorage.removeItem(`avex-tarifas-${tarifaTipo}`);
   localStorage.removeItem('avex-movidas');
   TARIFAS.length=0; TARIFAS_DEFAULT.forEach(t=>TARIFAS.push({...t}));
@@ -2648,6 +2707,7 @@ function resetearTarifario(){
 }
 
 function renderTarifario() {
+  renderTarifaTipoPills();
   renderFilasTarifas();
   renderFilasZonas();
   renderPreviewTarifario();
@@ -3491,7 +3551,7 @@ async function pConfirmarCobro() {
 
 async function pConfirmarCobroClaims() {
   pViaje.estado = 'completado';
-  pViaje.formaCobro = 'claims';
+  pViaje.formaCobro = pViaje.tipoServicio || 'seguro';
   pViaje.timestamps = pViaje.timestamps || {};
   pViaje.timestamps.completado = Date.now();
   await pGuardar(); await guardarEnHistorial(pViaje); pRender();
@@ -3558,12 +3618,12 @@ function pRender() {
       </div>
     </div>` : '';
 
-  // Cobro — Claims no tiene cobro al cliente (lo cubre el seguro)
-  const esClaims = v.tipoServicio === 'claims';
+  // Cobro — Solo "Particular" cobra al cliente; el resto lo gestiona el seguro/empresa
+  const esClaims = v.tipoServicio && v.tipoServicio !== 'particular';
   const cobroHtml = (v.estado === 'cobro' || v.estado === 'en-destino') ? (esClaims ? `
     <div class="p-cobro-card">
-      <div class="p-cobro-title">Servicio Claims</div>
-      <div class="p-cobro-sub" style="margin-bottom:14px;">El pago lo gestiona el seguro. No hay cobro directo al cliente.</div>
+      <div class="p-cobro-title">Servicio ${getTipoLabel(v.tipoServicio)}</div>
+      <div class="p-cobro-sub" style="margin-bottom:14px;">El pago lo gestiona ${getTipoLabel(v.tipoServicio)}. No hay cobro directo al cliente.</div>
       <button class="p-btn-confirmar" style="display:block;" onclick="pConfirmarCobroClaims()">✅ Confirmar cierre del viaje</button>
     </div>` : `
     <div class="p-cobro-card">
@@ -3589,7 +3649,7 @@ function pRender() {
     <div class="p-card" style="text-align:center;padding:32px 20px;">
       <div style="font-size:48px;margin-bottom:12px;">✅</div>
       <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;">Viaje completado</div>
-      <div style="font-size:13px;color:var(--muted);">${v.formaCobro === 'efectivo' ? '💵 Cobrado en efectivo' : v.formaCobro === 'claims' ? '📋 Pago por seguro (Claims)' : '🏦 Transferencia a AVEX'}</div>
+      <div style="font-size:13px;color:var(--muted);">${v.formaCobro === 'efectivo' ? '💵 Cobrado en efectivo' : v.formaCobro === 'transferencia' ? '🏦 Transferencia a AVEX' : '📋 Pago gestionado por ' + getTipoLabel(v.formaCobro)}</div>
     </div>` : '';
 
   // Desglose financiero — solo cuando el viaje está completado
@@ -3755,6 +3815,30 @@ if (localStorage.getItem('avex-tarifa-ver') !== TARIFA_VERSION) {
   localStorage.setItem('avex-tarifa-ver', TARIFA_VERSION);
 }
 
+// Migración: 'claims' → 'la-caja' en tipos y localStorage
+(function migrarClaimsALaCaja() {
+  // Migrar tarifas guardadas
+  const viejoKey = 'avex-tarifas-claims';
+  const nuevoKey = 'avex-tarifas-la-caja';
+  if (localStorage.getItem(viejoKey) && !localStorage.getItem(nuevoKey)) {
+    localStorage.setItem(nuevoKey, localStorage.getItem(viejoKey));
+    localStorage.removeItem(viejoKey);
+  }
+  // Migrar lista de tipos
+  const raw = localStorage.getItem('avex-tipos-tarifario');
+  if (raw) {
+    try {
+      const tipos = JSON.parse(raw);
+      let changed = false;
+      const migrated = tipos.map(t => {
+        if (t.key === 'claims') { changed = true; return { key: 'la-caja', label: 'La Caja', emoji: '📋' }; }
+        return t;
+      });
+      if (changed) localStorage.setItem('avex-tipos-tarifario', JSON.stringify(migrated));
+    } catch(e) {}
+  }
+})();
+
 // Inicialización async: Supabase auth primero
 async function init() {
   // Ver si es modo prestador (link con ?data=)
@@ -3776,6 +3860,7 @@ async function init() {
   }
   if(localStorage.getItem('avex-theme')==='light') toggleTheme();
   renderZonaPills();
+  renderCalcTipoPills();
   actualizarContadorHistorial();
   setInterval(()=>{ if(viajeActivoId) actualizarMonitor(viajeActivoId); }, 3000);
 
