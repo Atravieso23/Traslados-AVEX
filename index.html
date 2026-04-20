@@ -2555,23 +2555,13 @@ async function descargarDesglose(id) {
   cx.fillText('Generado por AVEX Traslados · ' + new Date().toLocaleDateString('es-AR'), CW/2, ry + 22);
   cx.textAlign = 'left';
 
-  // ── Convertir a blob y compartir ──────────────────────────────
-  canvas.toBlob(async (blob) => {
-    const file = new File([blob], filename, { type: 'image/jpeg' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: filename }); }
-      catch(e) { if (e.name !== 'AbortError') shareFallback(blob, filename); }
-    } else {
-      shareFallback(blob, filename);
-    }
+  // ── Descargar imagen ──────────────────────────────────────────
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
   }, 'image/jpeg', 0.95);
-}
-
-function shareFallback(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
 async function eliminarViaje(id){
