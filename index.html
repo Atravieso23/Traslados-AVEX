@@ -3597,7 +3597,7 @@ function pRender() {
   const hayMovidaP = (v.montoMovida || 0) > 0;
   const baseRealP  = (v.total || 0) - (v.montoIva || 0);   // precioBase = total - IVA
   const netaP      = (v.montoPrestador || 0) + (v.montoAvex || 0); // neta = precioBase - movida
-  const desgloseHtml = v.estado === 'completado' ? `
+  const desgloseHtml = `
     <div class="breakdown-card" style="margin:0;">
       <div class="breakdown-title">Desglose del viaje</div>
       <div class="breakdown-rows">
@@ -3632,7 +3632,7 @@ function pRender() {
           <span class="brow-amount">${fmt(v.montoAvex||0)}</span>
         </div>
       </div>
-    </div>` : '';
+    </div>`;
 
   document.getElementById('pContent').innerHTML = `
     <div class="p-card">
