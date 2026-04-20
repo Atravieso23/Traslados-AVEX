@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root {
   --black:#0B0B0B; --surface:#141414; --surface2:#1C1C1C; --surface3:#222;
@@ -2398,11 +2398,16 @@ async function copiarLink(id, btn){
 }
 
 async function descargarDesglose(id) {
-  let v = await obtenerViajeActivo(id);
+  // Buscar datos (cache primero — mantiene el user gesture en iOS)
+  let v = _historialCache.find(x => x.id === id) || _viajesActivosCache[id];
+  if (!v) v = await obtenerViajeActivo(id);
   if (!v) v = getHistorial().find(x => x.id === id);
   if (!v) { alert('No se encontraron los datos del viaje.'); return; }
 
-  const fmtP    = n => '$\u00a0' + Math.round(n).toLocaleString('es-AR');
+  if (!window.jspdf) { alert('Librería PDF cargando, intentá en un momento.'); return; }
+  const { jsPDF } = window.jspdf;
+
+  const fmtP    = n => '$ ' + Math.round(n).toLocaleString('es-AR');
   const baseReal = (v.total || 0) - (v.montoIva || 0);
   const neta     = (v.montoPrestador || 0) + (v.montoAvex || 0);
   const hayIva   = (v.montoIva || 0) > 0;
@@ -2415,95 +2420,151 @@ async function descargarDesglose(id) {
   const nombreVeh = [vehiculo, patente].filter(Boolean).join(' - ');
   const filename  = `Desglose${nombreVeh ? ' ' + nombreVeh : ' ' + v.id}.pdf`;
 
-  // ── HTML del PDF (colores hardcodeados, sin CSS vars) ──────────
-  const brow = (bg, name, desc, amount, color, barColor, barPct) => `
-    <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:11px 20px;border-bottom:1px solid #e9ecef;background:${bg};gap:12px;">
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <span style="font-size:13px;font-weight:500;color:#111827;">${name}</span>
-        <span style="font-size:11px;color:#6B7280;">${desc}</span>
-        ${barColor ? `<div style="margin-top:5px;height:4px;background:#dee2e6;border-radius:2px;overflow:hidden;"><div style="width:${barPct}%;height:100%;background:${barColor};border-radius:2px;"></div></div>` : ''}
-      </div>
-      <span style="font-size:16px;font-weight:600;text-align:right;white-space:nowrap;color:${color};">${amount}</span>
-    </div>`;
+  // ── Generar PDF con jsPDF (síncrono, sin html2canvas) ──────────
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  const W = 210, m = 14, cW = W - m * 2;
+  let y = 0;
 
-  const htmlContent = `
-    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;max-width:520px;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
-      <div style="background:#0B0B0B;padding:22px 24px;display:flex;align-items:center;">
-        <div>
-          <div style="font-size:20px;font-weight:900;letter-spacing:3px;color:#F59E0B;">AVEX</div>
-          <div style="font-size:10px;color:#9CA3AF;letter-spacing:1px;text-transform:uppercase;margin-top:3px;">Desglose de revenue</div>
-        </div>
-        <div style="margin-left:auto;text-align:right;">
-          <div style="font-size:12px;color:#F59E0B;font-weight:700;">${nombreVeh || v.id}</div>
-          <div style="font-size:10px;color:#6B7280;margin-top:3px;">${fecha}</div>
-        </div>
-      </div>
-      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6B7280;padding:14px 20px 8px;border-bottom:1px solid #e9ecef;">Datos del viaje</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 20px 14px;">
-        <div style="grid-column:1/-1;background:#f8f9fa;border-radius:7px;padding:9px 12px;">
-          <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9CA3AF;margin-bottom:3px;">Ruta</div>
-          <div style="font-size:12px;font-weight:600;color:#111827;">${shortAddr(v.origen)} → ${shortAddr(v.destino)}</div>
-        </div>
-        ${[
-          ['Cliente',   v.cliente||'—'],
-          ['Prestador', v.prestadorNombre||'—'],
-          ['Distancia', v.km+' km'],
-          ['Zona',      v.zona||'—'],
-          ['Tipo',      getTipoLabel(v.tipoServicio||'particular')],
-          ['Factura',   'Tipo '+(v.factura||'C')],
-        ].map(([l,val])=>`<div style="background:#f8f9fa;border-radius:7px;padding:9px 12px;"><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9CA3AF;margin-bottom:3px;">${l}</div><div style="font-size:12px;font-weight:600;color:#111827;">${val}</div></div>`).join('')}
-      </div>
-      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6B7280;padding:14px 20px 8px;border-top:1px solid #e9ecef;border-bottom:1px solid #e9ecef;">Desglose de revenue</div>
-      ${brow('#f8f9fa','Tarifa base','Precio del servicio sin impuestos',fmtP(baseReal),'#111827')}
-      ${hayIva ? brow('#f5f3ff','+ IVA 21%','Factura A — se cobra al cliente','+ '+fmtP(v.montoIva),'#7C3AED') : ''}
-      ${brow('#f1f3f5','Total al cliente',hayIva?'Tarifa + IVA 21%':'Sin IVA (Factura C)',fmtP(v.total),'#111827')}
-      ${hayMov ? brow('#fffbeb','− Movida del prestador',v.zona||'','− '+fmtP(v.montoMovida),'#D97706') : ''}
-      ${brow('#f8f9fa','Base neta','Sobre esta se divide el revenue',fmtP(neta),'#111827')}
-      ${brow('#f0fdf4','Prestador · 60%','Su ganancia por el servicio',fmtP(v.montoPrestador||0),'#16A34A','#22C55E',60)}
-      ${brow('#eff6ff','AVEX · 40%','Revenue de la plataforma',fmtP(v.montoAvex||0),'#2563EB','#3B82F6',40)}
-      <div style="padding:12px 20px;font-size:10px;color:#9CA3AF;text-align:center;border-top:1px solid #e9ecef;background:#f8f9fa;">
-        Generado por AVEX Traslados · ${new Date().toLocaleDateString('es-AR')}
-      </div>
-    </div>`;
+  // Header negro
+  doc.setFillColor(11, 11, 11);
+  doc.rect(0, 0, W, 28, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(245, 158, 11);
+  doc.text('AVEX', m, 12);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(156, 163, 175);
+  doc.text('DESGLOSE DE REVENUE', m, 19);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(245, 158, 11);
+  doc.text(nombreVeh || v.id, W - m, 12, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(156, 163, 175);
+  doc.text(fecha + '  |  ' + v.id, W - m, 19, { align: 'right' });
+  y = 34;
 
-  // ── Generar PDF con html2pdf ───────────────────────────────────
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:560px;background:#fff;';
-  container.innerHTML = htmlContent;
-  document.body.appendChild(container);
+  // ── helpers ────────────────────────────────────────────────────
+  const seccion = (titulo) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(107, 114, 128);
+    doc.text(titulo.toUpperCase(), m, y);
+    y += 2;
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.25);
+    doc.line(m, y, W - m, y);
+    y += 5;
+  };
 
-  try {
-    const pdfBlob = await html2pdf()
-      .set({
-        margin: [8, 10],
-        filename,
-        image: { type: 'jpeg', quality: 0.97 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: 'avoid-all' },
-      })
-      .from(container)
-      .outputPdf('blob');
+  const infoCell = (x, label, val, w) => {
+    doc.setFillColor(247, 248, 250);
+    doc.roundedRect(x, y - 3.5, w, 11, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(156, 163, 175);
+    doc.text(label.toUpperCase(), x + 3, y + 0.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(17, 24, 39);
+    // truncar si es muy largo
+    const maxW = w - 6;
+    const txt = doc.getTextWidth(val) > maxW ? doc.splitTextToSize(val, maxW)[0] + '…' : val;
+    doc.text(txt, x + 3, y + 6);
+  };
 
-    document.body.removeChild(container);
-
-    const file = new File([pdfBlob], filename, { type: 'application/pdf' });
-
-    // En móvil: Web Share API → el usuario elige WhatsApp
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: filename });
-    } else {
-      // Desktop: descarga el PDF directamente
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
+  const browRow = (bgR, bgG, bgB, name, desc, amount, aR, aG, aB, barR, barG, barB, barPct) => {
+    const rowH = (desc || barPct) ? 14 : 11;
+    doc.setFillColor(bgR, bgG, bgB);
+    doc.rect(m, y - 3, cW, rowH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(17, 24, 39);
+    doc.text(name, m + 3, y + 2.5);
+    if (desc) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(107, 114, 128);
+      doc.text(desc, m + 3, y + 7);
     }
-  } catch(e) {
-    if (container.parentNode) document.body.removeChild(container);
-    console.error('Error generando PDF:', e);
-    alert('No se pudo generar el PDF. Intentá de nuevo.');
+    if (barPct) {
+      doc.setFillColor(220, 222, 226);
+      doc.rect(m + 3, y + 9, cW * 0.45, 1.5, 'F');
+      doc.setFillColor(barR, barG, barB);
+      doc.rect(m + 3, y + 9, cW * 0.45 * barPct / 100, 1.5, 'F');
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(aR, aG, aB);
+    doc.text(amount, W - m - 3, y + 2.5, { align: 'right' });
+    doc.setDrawColor(230, 232, 235);
+    doc.setLineWidth(0.2);
+    doc.line(m, y + rowH - 3, W - m, y + rowH - 3);
+    y += rowH;
+  };
+
+  // ── Datos del viaje ────────────────────────────────────────────
+  seccion('Datos del viaje');
+
+  // Ruta (ancho completo)
+  infoCell(m, 'Ruta', shortAddr(v.origen) + '  →  ' + shortAddr(v.destino), cW);
+  y += 13;
+
+  // Grid 2 columnas
+  const cols = [
+    ['Cliente',      v.cliente || '—'],
+    ['Prestador',    v.prestadorNombre || '—'],
+    ['Distancia',    v.km + ' km'],
+    ['Zona',         v.zona || '—'],
+    ['Tipo servicio',getTipoLabel(v.tipoServicio || 'particular')],
+    ['Factura',      'Tipo ' + (v.factura || 'C')],
+  ];
+  const colW = (cW - 4) / 2;
+  for (let i = 0; i < cols.length; i += 2) {
+    infoCell(m,          cols[i][0],   cols[i][1],   colW);
+    if (cols[i+1]) infoCell(m + colW + 4, cols[i+1][0], cols[i+1][1], colW);
+    y += 13;
   }
+  y += 2;
+
+  // ── Desglose de revenue ────────────────────────────────────────
+  seccion('Desglose de revenue');
+
+  browRow(248,249,250, 'Tarifa base',          'Precio del servicio sin impuestos', fmtP(baseReal),         17,24,39);
+  if (hayIva)
+    browRow(245,243,255, '+ IVA 21%',            'Factura A — se cobra al cliente',   '+ '+fmtP(v.montoIva),  124,58,237);
+  browRow(241,243,245, 'Total al cliente',      hayIva?'Tarifa + IVA 21%':'Sin IVA', fmtP(v.total),          17,24,39);
+  if (hayMov)
+    browRow(255,251,235, '− Movida del prestador',v.zona||'',                          '− '+fmtP(v.montoMovida),217,119,6);
+  browRow(248,249,250, 'Base neta',             'Sobre esta se divide el revenue',   fmtP(neta),             17,24,39);
+  browRow(240,253,244, 'Prestador · 60%',       'Su ganancia por el servicio',       fmtP(v.montoPrestador||0),22,163,74, 34,197,94,60);
+  browRow(239,246,255, 'AVEX · 40%',            'Revenue de la plataforma',          fmtP(v.montoAvex||0),   37,99,235,  59,130,246,40);
+
+  y += 4;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(180, 180, 180);
+  doc.text('Generado por AVEX Traslados · ' + new Date().toLocaleDateString('es-AR'), W / 2, y, { align: 'center' });
+
+  // ── Compartir / descargar ──────────────────────────────────────
+  const pdfBlob = doc.output('blob');
+  const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: filename }); }
+    catch(e) { if (e.name !== 'AbortError') { shareFallback(pdfBlob, filename); } }
+  } else {
+    shareFallback(pdfBlob, filename);
+  }
+}
+
+function shareFallback(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
 async function eliminarViaje(id){
