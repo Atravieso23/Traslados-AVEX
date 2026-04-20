@@ -1987,7 +1987,7 @@ function renderHistorial(){
     <div class="hist-viaje" id="hv-${v.id}">
       <div class="hist-viaje-header" onclick="toggleHistViaje('${v.id}')">
         <div style="flex:1;">
-          <div class="hist-viaje-id">${v.id} · ${fecha}${v.tipoServicio && v.tipoServicio!=='particular'?' · <span style="color:var(--blue);font-weight:700;">${getTipoLabel(v.tipoServicio)}</span>':''}</div>
+          <div class="hist-viaje-id">${v.id} · ${fecha}${v.tipoServicio && v.tipoServicio!=='particular'?` · <span style="color:var(--blue);font-weight:700;">${getTipoLabel(v.tipoServicio)}</span>`:''}</div>
           <div class="hist-viaje-ruta">${v.origen.split(',')[0]} <span>→</span> ${v.destino.split(',')[0]}</div>
         </div>
         <div class="hist-estado-badge ${v.estado}">${v.estado==='completado'?'✓ Completado':v.estado.replace('-',' ')}</div>
