@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root {
   --black:#0B0B0B; --surface:#141414; --surface2:#1C1C1C; --surface3:#222;
@@ -2398,16 +2397,13 @@ async function copiarLink(id, btn){
 }
 
 async function descargarDesglose(id) {
-  // Buscar datos (cache primero — mantiene el user gesture en iOS)
+  // Cache-first: mantiene user gesture en iOS
   let v = _historialCache.find(x => x.id === id) || _viajesActivosCache[id];
   if (!v) v = await obtenerViajeActivo(id);
   if (!v) v = getHistorial().find(x => x.id === id);
   if (!v) { alert('No se encontraron los datos del viaje.'); return; }
 
-  if (!window.jspdf) { alert('Librería PDF cargando, intentá en un momento.'); return; }
-  const { jsPDF } = window.jspdf;
-
-  const fmtP    = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+  const fmtI    = n => '$ ' + Math.round(n).toLocaleString('es-AR');
   const baseReal = (v.total || 0) - (v.montoIva || 0);
   const neta     = (v.montoPrestador || 0) + (v.montoAvex || 0);
   const hayIva   = (v.montoIva || 0) > 0;
@@ -2418,146 +2414,157 @@ async function descargarDesglose(id) {
   const vehiculo  = v.vehiculoCliente || v.prestadorVehiculo || '';
   const patente   = v.patenteCliente  || v.prestadorPatente  || '';
   const nombreVeh = [vehiculo, patente].filter(Boolean).join(' - ');
-  const filename  = `Desglose${nombreVeh ? ' ' + nombreVeh : ' ' + v.id}.pdf`;
+  const filename  = `Desglose${nombreVeh ? ' ' + nombreVeh : ' ' + v.id}.jpg`;
 
-  // ── Generar PDF con jsPDF (síncrono, sin html2canvas) ──────────
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  const W = 210, m = 14, cW = W - m * 2;
-  let y = 0;
+  // ── Construir filas a dibujar ──────────────────────────────────
+  const rows = [
+    { label:'Tarifa base',           desc:'Precio del servicio sin impuestos', val:fmtI(baseReal),            bg:'#F8F9FA', color:'#111827' },
+    hayIva ? { label:'+ IVA 21%',   desc:'Factura A — se cobra al cliente',   val:'+ '+fmtI(v.montoIva),     bg:'#F5F3FF', color:'#7C3AED' } : null,
+    { label:'Total al cliente',      desc:hayIva?'Tarifa + IVA 21%':'Sin IVA',val:fmtI(v.total),             bg:'#F1F3F5', color:'#111827', bold:true },
+    hayMov ? { label:'− Movida',     desc:v.zona||'',                          val:'− '+fmtI(v.montoMovida),  bg:'#FFFBEB', color:'#D97706' } : null,
+    { label:'Base neta',             desc:'Sobre esta se divide el revenue',   val:fmtI(neta),                bg:'#F8F9FA', color:'#111827' },
+    { label:'Prestador · 60%',       desc:'Su ganancia por el servicio',       val:fmtI(v.montoPrestador||0), bg:'#F0FDF4', color:'#16A34A', bar:'#22C55E', barPct:60 },
+    { label:'AVEX · 40%',            desc:'Revenue de la plataforma',          val:fmtI(v.montoAvex||0),      bg:'#EFF6FF', color:'#2563EB', bar:'#3B82F6', barPct:40 },
+  ].filter(Boolean);
+
+  // ── Canvas ────────────────────────────────────────────────────
+  const S = 2;           // retina scale
+  const CW = 540;        // canvas width (lógico)
+  const HEADER = 72;
+  const INFO_H = 160;
+  const ROW_H  = 58;
+  const FOOT   = 36;
+  const totalH = HEADER + INFO_H + rows.length * ROW_H + FOOT;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = CW * S;
+  canvas.height = totalH * S;
+  const cx = canvas.getContext('2d');
+  cx.scale(S, S);
+
+  const rr = (x,y,w,h,r,fill) => {
+    cx.beginPath();
+    cx.moveTo(x+r,y); cx.lineTo(x+w-r,y); cx.quadraticCurveTo(x+w,y,x+w,y+r);
+    cx.lineTo(x+w,y+h-r); cx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    cx.lineTo(x+r,y+h); cx.quadraticCurveTo(x,y+h,x,y+h-r);
+    cx.lineTo(x,y+r); cx.quadraticCurveTo(x,y,x+r,y);
+    cx.closePath();
+    cx.fillStyle = fill; cx.fill();
+  };
 
   // Header negro
-  doc.setFillColor(11, 11, 11);
-  doc.rect(0, 0, W, 28, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(245, 158, 11);
-  doc.text('AVEX', m, 12);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(156, 163, 175);
-  doc.text('DESGLOSE DE REVENUE', m, 19);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(245, 158, 11);
-  doc.text(nombreVeh || v.id, W - m, 12, { align: 'right' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(156, 163, 175);
-  doc.text(fecha + '  |  ' + v.id, W - m, 19, { align: 'right' });
-  y = 34;
+  cx.fillStyle = '#0B0B0B';
+  cx.fillRect(0, 0, CW, HEADER);
+  cx.font = 'bold 26px system-ui,-apple-system,sans-serif';
+  cx.fillStyle = '#F59E0B';
+  cx.fillText('AVEX', 24, 34);
+  cx.font = '11px system-ui,-apple-system,sans-serif';
+  cx.fillStyle = '#9CA3AF';
+  cx.fillText('DESGLOSE DE REVENUE', 24, 52);
+  cx.textAlign = 'right';
+  cx.font = 'bold 12px system-ui,-apple-system,sans-serif';
+  cx.fillStyle = '#F59E0B';
+  cx.fillText(nombreVeh || v.id, CW - 24, 32);
+  cx.font = '10px system-ui,-apple-system,sans-serif';
+  cx.fillStyle = '#6B7280';
+  cx.fillText(fecha + '  ·  ' + v.id, CW - 24, 50);
+  cx.textAlign = 'left';
 
-  // ── helpers ────────────────────────────────────────────────────
-  const seccion = (titulo) => {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(107, 114, 128);
-    doc.text(titulo.toUpperCase(), m, y);
-    y += 2;
-    doc.setDrawColor(220, 220, 220);
-    doc.setLineWidth(0.25);
-    doc.line(m, y, W - m, y);
-    y += 5;
-  };
-
-  const infoCell = (x, label, val, w) => {
-    doc.setFillColor(247, 248, 250);
-    doc.roundedRect(x, y - 3.5, w, 11, 1, 1, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
-    doc.setTextColor(156, 163, 175);
-    doc.text(label.toUpperCase(), x + 3, y + 0.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(17, 24, 39);
-    // truncar si es muy largo
-    const maxW = w - 6;
-    const txt = doc.getTextWidth(val) > maxW ? doc.splitTextToSize(val, maxW)[0] + '…' : val;
-    doc.text(txt, x + 3, y + 6);
-  };
-
-  const browRow = (bgR, bgG, bgB, name, desc, amount, aR, aG, aB, barR, barG, barB, barPct) => {
-    const rowH = (desc || barPct) ? 14 : 11;
-    doc.setFillColor(bgR, bgG, bgB);
-    doc.rect(m, y - 3, cW, rowH, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
-    doc.setTextColor(17, 24, 39);
-    doc.text(name, m + 3, y + 2.5);
-    if (desc) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(107, 114, 128);
-      doc.text(desc, m + 3, y + 7);
-    }
-    if (barPct) {
-      doc.setFillColor(220, 222, 226);
-      doc.rect(m + 3, y + 9, cW * 0.45, 1.5, 'F');
-      doc.setFillColor(barR, barG, barB);
-      doc.rect(m + 3, y + 9, cW * 0.45 * barPct / 100, 1.5, 'F');
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(aR, aG, aB);
-    doc.text(amount, W - m - 3, y + 2.5, { align: 'right' });
-    doc.setDrawColor(230, 232, 235);
-    doc.setLineWidth(0.2);
-    doc.line(m, y + rowH - 3, W - m, y + rowH - 3);
-    y += rowH;
-  };
-
-  // ── Datos del viaje ────────────────────────────────────────────
-  seccion('Datos del viaje');
-
-  // Ruta (ancho completo)
-  infoCell(m, 'Ruta', shortAddr(v.origen) + '  →  ' + shortAddr(v.destino), cW);
-  y += 13;
-
-  // Grid 2 columnas
-  const cols = [
-    ['Cliente',      v.cliente || '—'],
-    ['Prestador',    v.prestadorNombre || '—'],
-    ['Distancia',    v.km + ' km'],
-    ['Zona',         v.zona || '—'],
-    ['Tipo servicio',getTipoLabel(v.tipoServicio || 'particular')],
-    ['Factura',      'Tipo ' + (v.factura || 'C')],
+  // Info grid
+  cx.fillStyle = '#ffffff';
+  cx.fillRect(0, HEADER, CW, INFO_H);
+  const infoPad = 16;
+  const infoItems = [
+    ['RUTA', shortAddr(v.origen) + '  →  ' + shortAddr(v.destino), true],
+    ['CLIENTE', v.cliente||'—', false],
+    ['PRESTADOR', v.prestadorNombre||'—', false],
+    ['DISTANCIA', v.km+' km', false],
+    ['ZONA', v.zona||'—', false],
+    ['TIPO', getTipoLabel(v.tipoServicio||'particular'), false],
+    ['FACTURA', 'Tipo '+(v.factura||'C'), false],
   ];
-  const colW = (cW - 4) / 2;
-  for (let i = 0; i < cols.length; i += 2) {
-    infoCell(m,          cols[i][0],   cols[i][1],   colW);
-    if (cols[i+1]) infoCell(m + colW + 4, cols[i+1][0], cols[i+1][1], colW);
-    y += 13;
+  let ix = infoPad, iy = HEADER + 14;
+  const iW2 = (CW - infoPad*2 - 8) / 2;
+  const iH  = 40;
+  for (let i = 0; i < infoItems.length; i++) {
+    const [lbl, val, full] = infoItems[i];
+    const cellW = full ? CW - infoPad*2 : iW2;
+    const cellX = full ? infoPad : (i % 2 === 0 || full) ? infoPad : infoPad + iW2 + 8;
+    if (!full && i % 2 === 0 && i > 0) iy += iH + 6;
+    if (full && i > 0) iy += iH + 6;
+    rr(cellX, iy, cellW, iH, 6, '#F3F4F6');
+    cx.font = 'bold 9px system-ui,-apple-system,sans-serif';
+    cx.fillStyle = '#9CA3AF';
+    cx.fillText(lbl, cellX + 10, iy + 13);
+    cx.font = 'bold 12px system-ui,-apple-system,sans-serif';
+    cx.fillStyle = '#111827';
+    // truncar
+    let txtVal = val;
+    while (cx.measureText(txtVal).width > cellW - 20 && txtVal.length > 4) txtVal = txtVal.slice(0,-2)+'…';
+    cx.fillText(txtVal, cellX + 10, iy + 28);
   }
-  y += 2;
 
-  // ── Desglose de revenue ────────────────────────────────────────
-  seccion('Desglose de revenue');
+  // Separador título desglose
+  let ry = HEADER + INFO_H;
+  cx.fillStyle = '#F8F9FA';
+  cx.fillRect(0, ry, CW, 28);
+  cx.font = 'bold 9px system-ui,-apple-system,sans-serif';
+  cx.fillStyle = '#6B7280';
+  cx.fillText('DESGLOSE DE REVENUE', 24, ry + 18);
+  ry += 28;
 
-  browRow(248,249,250, 'Tarifa base',          'Precio del servicio sin impuestos', fmtP(baseReal),         17,24,39);
-  if (hayIva)
-    browRow(245,243,255, '+ IVA 21%',            'Factura A — se cobra al cliente',   '+ '+fmtP(v.montoIva),  124,58,237);
-  browRow(241,243,245, 'Total al cliente',      hayIva?'Tarifa + IVA 21%':'Sin IVA', fmtP(v.total),          17,24,39);
-  if (hayMov)
-    browRow(255,251,235, '− Movida del prestador',v.zona||'',                          '− '+fmtP(v.montoMovida),217,119,6);
-  browRow(248,249,250, 'Base neta',             'Sobre esta se divide el revenue',   fmtP(neta),             17,24,39);
-  browRow(240,253,244, 'Prestador · 60%',       'Su ganancia por el servicio',       fmtP(v.montoPrestador||0),22,163,74, 34,197,94,60);
-  browRow(239,246,255, 'AVEX · 40%',            'Revenue de la plataforma',          fmtP(v.montoAvex||0),   37,99,235,  59,130,246,40);
+  // Filas
+  rows.forEach(row => {
+    cx.fillStyle = row.bg;
+    cx.fillRect(0, ry, CW, ROW_H);
+    // borde inferior
+    cx.fillStyle = '#E5E7EB';
+    cx.fillRect(0, ry + ROW_H - 1, CW, 1);
+    // label
+    cx.font = 'bold 14px system-ui,-apple-system,sans-serif';
+    cx.fillStyle = '#111827';
+    cx.fillText(row.label, 24, ry + 20);
+    // desc
+    if (row.desc) {
+      cx.font = '11px system-ui,-apple-system,sans-serif';
+      cx.fillStyle = '#6B7280';
+      cx.fillText(row.desc, 24, ry + 35);
+    }
+    // barra
+    if (row.bar) {
+      cx.fillStyle = '#DEE2E6';
+      cx.fillRect(24, ry + 44, 160, 4);
+      cx.fillStyle = row.bar;
+      cx.fillRect(24, ry + 44, 160 * row.barPct / 100, 4);
+    }
+    // amount
+    cx.textAlign = 'right';
+    cx.font = (row.bold ? 'bold ' : 'bold ') + '16px system-ui,-apple-system,sans-serif';
+    cx.fillStyle = row.color;
+    cx.fillText(row.val, CW - 24, ry + 22);
+    cx.textAlign = 'left';
+    ry += ROW_H;
+  });
 
-  y += 4;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(180, 180, 180);
-  doc.text('Generado por AVEX Traslados · ' + new Date().toLocaleDateString('es-AR'), W / 2, y, { align: 'center' });
+  // Footer
+  cx.fillStyle = '#F8F9FA';
+  cx.fillRect(0, ry, CW, FOOT);
+  cx.font = '10px system-ui,-apple-system,sans-serif';
+  cx.fillStyle = '#9CA3AF';
+  cx.textAlign = 'center';
+  cx.fillText('Generado por AVEX Traslados · ' + new Date().toLocaleDateString('es-AR'), CW/2, ry + 22);
+  cx.textAlign = 'left';
 
-  // ── Compartir / descargar ──────────────────────────────────────
-  const pdfBlob = doc.output('blob');
-  const file = new File([pdfBlob], filename, { type: 'application/pdf' });
-
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: filename }); }
-    catch(e) { if (e.name !== 'AbortError') { shareFallback(pdfBlob, filename); } }
-  } else {
-    shareFallback(pdfBlob, filename);
-  }
+  // ── Convertir a blob y compartir ──────────────────────────────
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], filename, { type: 'image/jpeg' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: filename }); }
+      catch(e) { if (e.name !== 'AbortError') shareFallback(blob, filename); }
+    } else {
+      shareFallback(blob, filename);
+    }
+  }, 'image/jpeg', 0.95);
 }
 
 function shareFallback(blob, filename) {
