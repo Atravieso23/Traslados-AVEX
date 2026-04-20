@@ -264,6 +264,7 @@ input::placeholder{color:#404040;}
 .hist-estado-badge.pendiente{background:#1a1a0a;color:var(--orange);border:1px solid var(--orange);}
 .hist-estado-badge.en-camino,.hist-estado-badge.en-origen,.hist-estado-badge.en-destino,.hist-estado-badge.cobro{background:#0d1f16;color:var(--accent);border:1px solid var(--accent);}
 .hist-estado-badge.completado{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);}
+.hist-estado-badge.cancelado{background:#2d0a0a;color:#EF4444;border:1px solid #EF4444;}
 .hist-viaje-body{display:none;border-top:1px solid var(--border);padding:14px 18px;}
 .hist-viaje.expanded .hist-viaje-body{display:block;}
 .hist-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
@@ -851,6 +852,7 @@ input::placeholder{color:#404040;}
       <select id="filtroEstado" onchange="renderHistorial()">
         <option value="">Todos</option>
         <option value="completado">Completado</option>
+        <option value="cancelado">Cancelado</option>
         <option value="pendiente">Pendiente</option>
         <option value="en-camino">En camino</option>
         <option value="en-origen">En origen</option>
@@ -1990,7 +1992,7 @@ function renderHistorial(){
           <div class="hist-viaje-id">${v.id} · ${fecha}${v.tipoServicio && v.tipoServicio!=='particular'?` · <span style="color:var(--blue);font-weight:700;">${getTipoLabel(v.tipoServicio)}</span>`:''}</div>
           <div class="hist-viaje-ruta">${v.origen.split(',')[0]} <span>→</span> ${v.destino.split(',')[0]}</div>
         </div>
-        <div class="hist-estado-badge ${v.estado}">${v.estado==='completado'?'✓ Completado':v.estado.replace('-',' ')}</div>
+        <div class="hist-estado-badge ${v.estado}">${v.estado==='completado'?'✓ Completado':v.estado==='cancelado'?'✕ Cancelado':v.estado.replace('-',' ')}</div>
       </div>
       <div class="hist-viaje-body">
         <div class="hist-grid">
@@ -2010,6 +2012,7 @@ function renderHistorial(){
           <button class="hist-btn" onclick="copiarLink('${v.id}', this)">🔗 Copiar link</button>
           <button class="hist-btn" onclick="descargarDesglose('${v.id}')" style="border-color:#25D366;color:#25D366;">📄 Desglose PDF</button>
           <button class="hist-btn" onclick="corregirViaje('${v.id}')" style="border-color:var(--blue);color:var(--blue);">✏️ Corregir</button>
+          ${v.estado !== 'cancelado' ? `<button class="hist-btn" onclick="cancelarViaje('${v.id}')" style="border-color:#EF4444;color:#EF4444;">✕ Cancelar</button>` : ''}
           <button class="hist-btn danger" onclick="eliminarViaje('${v.id}')">🗑 Eliminar</button>
           ${rolActual === 'admin@avex.com' ? `
           <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
@@ -2021,6 +2024,7 @@ function renderHistorial(){
               <option value="en-destino"    ${v.estado==='en-destino'    ?'selected':''}>En destino</option>
               <option value="cobro"         ${v.estado==='cobro'         ?'selected':''}>Cobro</option>
               <option value="completado"    ${v.estado==='completado'    ?'selected':''}>Completado</option>
+              <option value="cancelado"     ${v.estado==='cancelado'     ?'selected':''}>Cancelado</option>
             </select>
           </div>` : ''}
         </div>
@@ -2040,12 +2044,37 @@ function renderHistorial(){
 async function cambiarEstadoAdmin(viajeId, nuevoEstado) {
   const idx = _historialCache.findIndex(v => v.id === viajeId);
   if (idx < 0) return;
-  _historialCache[idx].estado = nuevoEstado;
-  if (!_historialCache[idx].timestamps) _historialCache[idx].timestamps = {};
-  _historialCache[idx].timestamps[nuevoEstado] = Date.now();
-  await guardarEnHistorial(_historialCache[idx]);
+  const v = _historialCache[idx];
+  v.estado = nuevoEstado;
+  if (!v.timestamps) v.timestamps = {};
+  v.timestamps[nuevoEstado] = Date.now();
+  // Si se cancela desde el dropdown de admin, calcular montos cancelados
+  if (nuevoEstado === 'cancelado' && !v.montoAvexCancelado) {
+    const baseReal = (v.total || 0) - (v.montoIva || 0);
+    const movida   = v.montoMovida || 0;
+    v.montoAvexCancelado       = baseReal - movida;
+    v.montoPrestadorCancelado  = movida;
+  }
+  await guardarEnHistorial(v);
   // También actualizar viajes_activos para que el sync no lo pise
-  await guardarViajeActivo(_historialCache[idx]);
+  await guardarViajeActivo(v);
+  renderHistorial();
+}
+
+async function cancelarViaje(id) {
+  if (!confirm('¿Cancelar este servicio?\n\nAVEX se lleva: tarifa base − movida\nPrestador se lleva: solo la movida')) return;
+  const idx = _historialCache.findIndex(v => v.id === id);
+  if (idx < 0) return;
+  const v = _historialCache[idx];
+  const baseReal = (v.total || 0) - (v.montoIva || 0);
+  const movida   = v.montoMovida || 0;
+  v.estado                    = 'cancelado';
+  v.montoAvexCancelado        = baseReal - movida;
+  v.montoPrestadorCancelado   = movida;
+  if (!v.timestamps) v.timestamps = {};
+  v.timestamps.cancelado = Date.now();
+  await guardarEnHistorial(v);
+  await guardarViajeActivo(v);
   renderHistorial();
 }
 
@@ -2887,7 +2916,7 @@ function renderLiquidaciones(){
   const desde=document.getElementById('liqDesde')?.value||'';
   const hasta=document.getElementById('liqHasta')?.value||'';
   const viajes=getHistorial().filter(v=>{
-    if(v.estado!=='completado')return false;
+    if(v.estado!=='completado'&&v.estado!=='cancelado')return false;
     if(v.liquidado)return false;
     if(desde){if(new Date(v.createdAt)<new Date(desde))return false;}
     if(hasta){const h=new Date(hasta);h.setHours(23,59,59);if(new Date(v.createdAt)>h)return false;}
@@ -2906,11 +2935,12 @@ function renderLiquidaciones(){
   // Stats globales
   let gTotalFact=0, gIva=0, gRevAvex=0, gRevPrest=0, gMovida=0;
   viajes.forEach(v=>{
+    const cancelado = v.estado === 'cancelado';
     gTotalFact+=(v.total||0);
     gIva+=(v.montoIva||0);
-    gRevAvex+=(v.montoAvex||0);
-    gRevPrest+=(v.montoPrestador||0);
-    gMovida+=(v.montoMovida||0);
+    gRevAvex  += cancelado ? (v.montoAvexCancelado||0)      : (v.montoAvex||0);
+    gRevPrest += cancelado ? (v.montoPrestadorCancelado||0) : (v.montoPrestador||0);
+    gMovida   += cancelado ? 0 : (v.montoMovida||0);
   });
   const gTotalPrest = gRevPrest + gMovida;
 
@@ -2935,19 +2965,22 @@ function renderLiquidaciones(){
     let totalFact=0, totalIva=0, totalRevAvex=0, totalRevPrest=0, totalMovida=0;
 
     vjs.forEach(v=>{
-      const movida=v.montoMovida||0;
+      const cancelado=v.estado==='cancelado';
+      const movida=cancelado?0:(v.montoMovida||0);
+      const revPrest=cancelado?(v.montoPrestadorCancelado||0):(v.montoPrestador||0);
+      const revAvex =cancelado?(v.montoAvexCancelado||0):(v.montoAvex||0);
       totalFact    +=(v.total||0);
       totalIva     +=(v.montoIva||0);
-      totalRevAvex +=(v.montoAvex||0);
-      totalRevPrest+=(v.montoPrestador||0);
+      totalRevAvex +=revAvex;
+      totalRevPrest+=revPrest;
       totalMovida  +=movida;
       if(v.formaCobro==='efectivo'){
         cobradoPrest   +=(v.total||0);
-        revPrestEfectivo+=(v.montoPrestador||0);
+        revPrestEfectivo+=revPrest;
         movPrest       +=movida;
       } else {
         cobradoAvex  +=(v.total||0);
-        revAvexTransf+=(v.montoPrestador||0);
+        revAvexTransf+=revPrest;
         movAvex      +=movida;
       }
     });
@@ -2980,17 +3013,20 @@ function renderLiquidaciones(){
     const thStyle = 'padding:8px 10px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;';
 
     const filas=vjs.map(v=>{
+      const cancelado=v.estado==='cancelado';
       const fecha=v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}):'—';
       const iva=v.montoIva||0;
       const base=(v.total||0)-iva;
-      const revPrest=v.montoPrestador||0;
-      const revAvex=v.montoAvex||0;
-      const movida=v.montoMovida||0;
+      const revPrest=cancelado?(v.montoPrestadorCancelado||0):(v.montoPrestador||0);
+      const revAvex =cancelado?(v.montoAvexCancelado||0):(v.montoAvex||0);
+      const movida  =cancelado?0:(v.montoMovida||0);
       const esCash=v.formaCobro==='efectivo';
-      return `<tr>
-        <td style="${tdStyle}color:var(--text);">${fecha}</td>
+      const cancBadge=cancelado?`<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.8px;background:#2d0a0a;color:#EF4444;border:1px solid #EF4444;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;">CANC.</span>`:'';
+      const rowOpacity=cancelado?'opacity:.75;':'';
+      return `<tr style="${rowOpacity}">
+        <td style="${tdStyle}color:var(--text);">${fecha}${cancBadge}</td>
         <td style="${tdStyle}font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);">${(v.origen||'').split(',')[0]} → ${(v.destino||'').split(',')[0]}</td>
-        <td style="${tdStyle}font-weight:600;color:var(--text);text-align:right;">${fmt(v.total)}</td>
+        <td style="${tdStyle}font-weight:600;color:${cancelado?'var(--muted)':'var(--text)'};text-align:right;${cancelado?'text-decoration:line-through;':''}">${fmt(v.total)}</td>
         <td style="${tdStyle}color:#A78BFA;font-weight:600;text-align:right;">${iva>0?fmt(iva):'—'}</td>
         <td style="${tdStyle}color:var(--muted);text-align:right;">${fmt(base)}</td>
         <td style="${tdStyle}color:var(--orange,#F59E0B);font-weight:600;text-align:right;">${movida>0?fmt(movida):'—'}</td>
