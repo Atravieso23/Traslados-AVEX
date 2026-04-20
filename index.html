@@ -2394,39 +2394,43 @@ async function descargarDesglose(id) {
   const fecha = v.createdAt
     ? new Date(v.createdAt).toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})
     : '—';
-  const neta       = (v.total || 0) - (v.montoIva || 0);
-  const baseReal   = neta - (v.montoMovida || 0);
+  const baseReal   = (v.total || 0) - (v.montoIva || 0);   // precioBase
+  const neta       = (v.montoPrestador || 0) + (v.montoAvex || 0);
   const hayIva     = (v.montoIva || 0) > 0;
+  const hayMovida  = (v.montoMovida || 0) > 0;
+  const fmtP = n => '$\u00a0' + Math.round(n).toLocaleString('es-AR');
 
-  const fmtP = n => '$\u202f' + Math.round(n).toLocaleString('es-AR');
-
-  const row = (label, val, color) =>
-    `<tr><td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:13px;">${label}</td>
-     <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;font-size:13px;color:${color||'#111827'};">${val}</td></tr>`;
+  const brow = (cls, name, desc, amount, amountColor, barColor, barPct) => `
+    <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:11px 20px;border-bottom:1px solid #e9ecef;background:${cls};gap:12px;">
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:13px;font-weight:500;color:#111827;">${name}</span>
+        <span style="font-size:11px;color:#6B7280;">${desc}</span>
+        ${barColor ? `<div style="margin-top:5px;height:4px;background:#dee2e6;border-radius:2px;overflow:hidden;width:100%;"><div style="width:${barPct}%;height:100%;background:${barColor};border-radius:2px;"></div></div>` : ''}
+      </div>
+      <span style="font-size:16px;font-weight:600;text-align:right;white-space:nowrap;color:${amountColor};">${amount}</span>
+    </div>`;
 
   const html = `<!DOCTYPE html>
 <html lang="es"><head>
 <meta charset="UTF-8">
 <title>Desglose · ${v.id}</title>
 <style>
-  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background:#f9fafb; margin:0; padding:32px; color:#111827; }
-  .wrap { max-width:520px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 2px 16px rgba(0,0,0,.08); overflow:hidden; }
-  .header { background:#0B0B0B; padding:24px 28px; display:flex; align-items:center; gap:16px; }
-  .header-logo { font-size:22px; font-weight:900; letter-spacing:3px; color:#F59E0B; }
-  .header-sub { font-size:11px; color:#9CA3AF; letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
-  .section { padding:20px 28px 0; }
-  .section-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#6B7280; margin-bottom:12px; }
-  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:20px; }
-  .info-cell { background:#f3f4f6; border-radius:8px; padding:10px 12px; }
-  .info-label { font-size:10px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:#9CA3AF; margin-bottom:3px; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:#f3f4f6; padding:32px 16px; color:#111827; }
+  .wrap { max-width:520px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 2px 20px rgba(0,0,0,.10); overflow:hidden; }
+  .header { background:#0B0B0B; padding:22px 24px; display:flex; align-items:center; }
+  .header-logo { font-size:20px; font-weight:900; letter-spacing:3px; color:#F59E0B; }
+  .header-sub { font-size:10px; color:#9CA3AF; letter-spacing:1px; text-transform:uppercase; margin-top:3px; }
+  .section-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#6B7280; padding:16px 20px 10px; border-bottom:1px solid #e9ecef; }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:14px 20px 16px; }
+  .info-cell { background:#f8f9fa; border-radius:7px; padding:9px 12px; }
+  .info-label { font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#9CA3AF; margin-bottom:3px; }
   .info-value { font-size:12px; font-weight:600; color:#111827; }
-  table { width:100%; border-collapse:collapse; }
-  .total-row td { padding:14px 14px; font-size:15px; font-weight:700; background:#f9fafb; }
-  .divider { height:1px; background:#e5e7eb; margin:0 28px; }
-  .footer { padding:16px 28px 24px; font-size:11px; color:#9CA3AF; text-align:center; }
+  .footer { padding:14px 20px; font-size:10px; color:#9CA3AF; text-align:center; border-top:1px solid #e9ecef; background:#f8f9fa; }
   @media print {
     body { background:#fff; padding:0; }
-    .wrap { box-shadow:none; border-radius:0; }
+    .wrap { box-shadow:none; border-radius:0; max-width:100%; }
   }
 </style>
 </head><body>
@@ -2434,56 +2438,36 @@ async function descargarDesglose(id) {
   <div class="header">
     <div>
       <div class="header-logo">AVEX</div>
-      <div class="header-sub">Desglose de revenue · Viaje</div>
+      <div class="header-sub">Desglose de revenue</div>
     </div>
     <div style="margin-left:auto;text-align:right;">
       <div style="font-size:12px;color:#F59E0B;font-weight:700;">${v.id}</div>
-      <div style="font-size:11px;color:#6B7280;margin-top:2px;">${fecha}</div>
+      <div style="font-size:10px;color:#6B7280;margin-top:3px;">${fecha}</div>
     </div>
   </div>
 
-  <div class="section" style="padding-top:20px;">
-    <div class="section-title">Datos del viaje</div>
-    <div class="info-grid">
-      <div class="info-cell" style="grid-column:1/-1;">
-        <div class="info-label">Ruta</div>
-        <div class="info-value">${v.origen.split(',')[0]} → ${v.destino.split(',')[0]}</div>
-      </div>
-      <div class="info-cell"><div class="info-label">Cliente</div><div class="info-value">${v.cliente||'—'}</div></div>
-      <div class="info-cell"><div class="info-label">Prestador</div><div class="info-value">${v.prestadorNombre||'—'}</div></div>
-      <div class="info-cell"><div class="info-label">Distancia</div><div class="info-value">${v.km} km</div></div>
-      <div class="info-cell"><div class="info-label">Zona</div><div class="info-value">${v.zona||'—'}</div></div>
-      <div class="info-cell"><div class="info-label">Tipo servicio</div><div class="info-value">${v.tipoServicio==='claims'?'Claims (Seguro)':'Particular'}</div></div>
-      <div class="info-cell"><div class="info-label">Factura</div><div class="info-value">Tipo ${v.factura||'C'}</div></div>
+  <div class="section-title">Datos del viaje</div>
+  <div class="info-grid">
+    <div class="info-cell" style="grid-column:1/-1;">
+      <div class="info-label">Ruta</div>
+      <div class="info-value">${v.origen.split(',')[0]} → ${v.destino.split(',')[0]}</div>
     </div>
+    <div class="info-cell"><div class="info-label">Cliente</div><div class="info-value">${v.cliente||'—'}</div></div>
+    <div class="info-cell"><div class="info-label">Prestador</div><div class="info-value">${v.prestadorNombre||'—'}</div></div>
+    <div class="info-cell"><div class="info-label">Distancia</div><div class="info-value">${v.km} km</div></div>
+    <div class="info-cell"><div class="info-label">Zona</div><div class="info-value">${v.zona||'—'}</div></div>
+    <div class="info-cell"><div class="info-label">Tipo servicio</div><div class="info-value">${v.tipoServicio==='claims'?'Claims':'Particular'}</div></div>
+    <div class="info-cell"><div class="info-label">Factura</div><div class="info-value">Tipo ${v.factura||'C'}</div></div>
   </div>
 
-  <div class="divider"></div>
-
-  <div class="section" style="padding-top:20px;padding-bottom:4px;">
-    <div class="section-title">Desglose de ingresos</div>
-  </div>
-  <table>
-    ${row('Tarifa base', fmtP(baseReal), '#111827')}
-    ${(v.montoMovida||0) > 0 ? row('Movida prestador', fmtP(v.montoMovida), '#F59E0B') : ''}
-    ${hayIva ? row('IVA 21% (Factura A)', fmtP(v.montoIva), '#8B5CF6') : ''}
-    <tr class="total-row">
-      <td style="border-top:2px solid #111827;">Total cobrado al cliente</td>
-      <td style="border-top:2px solid #111827;text-align:right;color:#111827;">${fmtP(v.total)}</td>
-    </tr>
-  </table>
-
-  <div class="divider" style="margin-top:4px;"></div>
-
-  <div class="section" style="padding-top:20px;padding-bottom:4px;">
-    <div class="section-title">Distribución</div>
-  </div>
-  <table>
-    ${row('Neta (sin IVA' + ((v.montoMovida||0)>0?' ni movida':'')+  ')', fmtP(neta - (v.montoMovida||0)), '#111827')}
-    ${(v.montoMovida||0) > 0 ? row('+ Movida prestador', fmtP(v.montoMovida), '#F59E0B') : ''}
-    ${row('Parte prestador (60%)', fmtP(v.montoPrestador||0), '#16A34A')}
-    ${row('Parte AVEX (40%)', fmtP(v.montoAvex||0), '#2563EB')}
-  </table>
+  <div class="section-title">Desglose de revenue</div>
+  ${brow('#f8f9fa', 'Tarifa base', 'Precio del servicio sin impuestos', fmtP(baseReal), '#111827')}
+  ${hayIva ? brow('#f5f3ff', '+ IVA 21%', 'Factura A — se cobra al cliente', '+ '+fmtP(v.montoIva), '#7C3AED') : ''}
+  ${brow('#f1f3f5', 'Total al cliente', hayIva ? 'Tarifa + IVA 21%' : 'Sin IVA (Factura C)', fmtP(v.total), '#111827')}
+  ${hayMovida ? brow('#fffbeb', '− Movida del prestador', v.zona||'', '− '+fmtP(v.montoMovida), '#D97706') : ''}
+  ${brow('#f8f9fa', 'Base neta', 'Sobre esta se divide el revenue', fmtP(neta), '#111827')}
+  ${brow('#f0fdf4', 'Prestador · 60%', 'Su ganancia por el servicio', fmtP(v.montoPrestador||0), '#16A34A', '#22C55E', 60)}
+  ${brow('#eff6ff', 'AVEX · 40%', 'Revenue de la plataforma', fmtP(v.montoAvex||0), '#2563EB', '#3B82F6', 40)}
 
   <div class="footer">Generado por AVEX Traslados · ${new Date().toLocaleDateString('es-AR')}</div>
 </div>
@@ -3609,38 +3593,43 @@ function pRender() {
     </div>` : '';
 
   // Desglose financiero — solo cuando el viaje está completado
-  const hayIvaP = (v.montoIva || 0) > 0;
-  const netaP   = (v.total || 0) - (v.montoIva || 0);
-  const baseRealP = netaP - (v.montoMovida || 0);
+  const hayIvaP   = (v.montoIva || 0) > 0;
+  const hayMovidaP = (v.montoMovida || 0) > 0;
+  const baseRealP  = (v.total || 0) - (v.montoIva || 0);   // precioBase = total - IVA
+  const netaP      = (v.montoPrestador || 0) + (v.montoAvex || 0); // neta = precioBase - movida
   const desgloseHtml = v.estado === 'completado' ? `
-    <div class="p-card" style="padding:16px 18px;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;">💰 Desglose del viaje</div>
-      <div style="display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);">
-          <span style="font-size:12px;color:var(--muted);">Tarifa base</span>
-          <span style="font-size:13px;font-weight:600;color:var(--text);">${fmt(baseRealP)}</span>
+    <div class="breakdown-card" style="margin:0;">
+      <div class="breakdown-title">Desglose del viaje</div>
+      <div class="breakdown-rows">
+        <div class="brow total">
+          <div class="brow-left"><span class="brow-name">Tarifa base</span><span class="brow-desc">Precio del servicio sin impuestos</span></div>
+          <span class="brow-amount">${fmt(baseRealP)}</span>
         </div>
-        ${(v.montoMovida||0) > 0 ? `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);">
-          <span style="font-size:12px;color:var(--muted);">Movida</span>
-          <span style="font-size:13px;font-weight:600;color:var(--orange);">${fmt(v.montoMovida)}</span>
-        </div>` : ''}
         ${hayIvaP ? `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);">
-          <span style="font-size:12px;color:var(--muted);">IVA 21% (Fact. A)</span>
-          <span style="font-size:13px;font-weight:600;color:var(--purple);">${fmt(v.montoIva)}</span>
+        <div class="brow iva">
+          <div class="brow-left"><span class="brow-name">+ IVA 21%</span><span class="brow-desc">Factura A — se cobra al cliente</span></div>
+          <span class="brow-amount">+ ${fmt(v.montoIva)}</span>
         </div>` : ''}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--surface2);border-bottom:1px solid var(--border);">
-          <span style="font-size:12px;font-weight:700;color:var(--text);">Total cobrado</span>
-          <span style="font-size:15px;font-weight:700;color:var(--text);">${fmt(v.total)}</span>
+        <div class="brow total" style="border-top:1px solid #2b2b2b;">
+          <div class="brow-left"><span class="brow-name">Total al cliente</span><span class="brow-desc">${hayIvaP ? 'Tarifa + IVA 21%' : 'Sin IVA (Factura C)'}</span></div>
+          <span class="brow-amount" style="font-size:18px;">${fmt(v.total)}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(34,197,94,.06);">
-          <span style="font-size:12px;color:var(--muted);">Tu parte (60%)</span>
-          <span style="font-size:13px;font-weight:700;color:var(--accent);">${fmt((v.montoPrestador||0)+(v.montoMovida||0))}</span>
+        ${hayMovidaP ? `
+        <div class="brow movida">
+          <div class="brow-left"><span class="brow-name">− Movida del prestador</span><span class="brow-desc">${v.zona||''}</span></div>
+          <span class="brow-amount">− ${fmt(v.montoMovida)}</span>
+        </div>` : ''}
+        <div class="brow neta">
+          <div class="brow-left"><span class="brow-name">Base neta</span><span class="brow-desc">Sobre esta se divide el revenue</span></div>
+          <span class="brow-amount">${fmt(netaP)}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(59,130,246,.06);">
-          <span style="font-size:12px;color:var(--muted);">Parte AVEX (40%)</span>
-          <span style="font-size:13px;font-weight:600;color:var(--blue);">${fmt(v.montoAvex||0)}</span>
+        <div class="brow prestador">
+          <div class="brow-left"><span class="brow-name">Prestador · 60%</span><span class="brow-desc">Tu ganancia por el servicio</span><div class="pct-bar-wrap"><div class="pct-bar" style="width:60%;background:#22C55E;"></div></div></div>
+          <span class="brow-amount">${fmt(v.montoPrestador||0)}</span>
+        </div>
+        <div class="brow avex">
+          <div class="brow-left"><span class="brow-name">AVEX · 40%</span><span class="brow-desc">Revenue de la plataforma</span><div class="pct-bar-wrap"><div class="pct-bar" style="width:40%;background:#3B82F6;"></div></div></div>
+          <span class="brow-amount">${fmt(v.montoAvex||0)}</span>
         </div>
       </div>
     </div>` : '';
