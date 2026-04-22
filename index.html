@@ -2944,10 +2944,13 @@ async function descargarDesglose(id) {
   const folderId        = prest?.driveFolderId?.trim();
 
   // Feedback si falta configuración
-  if (folderId && !scriptUrl) {
-    showDriveToast('⚠ Falta la URL del Apps Script en Tarifario → Prestadores', '#F59E0B'); return;
+  if (!scriptUrl && !folderId) return; // prestador sin Drive: solo descarga, sin aviso
+  if (!scriptUrl) {
+    showDriveToast('⚠ Falta la URL del Apps Script — configurala en Tarifario → Prestadores', '#F59E0B'); return;
   }
-  if (!folderId || !scriptUrl) return; // sin Drive configurado: solo descarga, sin aviso
+  if (!folderId) {
+    showDriveToast('⚠ El prestador no tiene ID de carpeta Drive — configuralo en Tarifario → Prestadores', '#F59E0B'); return;
+  }
 
   showDriveToast('📤 Subiendo a Drive...');
   try {
