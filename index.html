@@ -989,7 +989,19 @@ input::placeholder{color:#404040;}
       <button onclick="abrirModalPrestador(null)" style="padding:6px 14px;border-radius:5px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-family:'Inter',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">+ Agregar</button>
     </div>
     <div style="padding:14px 18px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Configurá los datos de cada prestador. El link de Drive (Google Apps Script) permite que el Desglose PDF se suba automáticamente a esa carpeta compartida.</div>
+
+      <!-- URL global del script (una sola vez) -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:16px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">🔗 URL del Google Apps Script (global)</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Un solo script para todos los prestadores. Cada prestador tiene su propio ID de carpeta de Drive.</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="driveScriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec"
+            style="flex:1;font-size:12px;padding:8px 12px;"
+            oninput="guardarDriveScriptUrl()">
+          <span id="driveScriptUrlOk" style="font-size:12px;color:var(--accent);display:none;white-space:nowrap;">✓ Guardado</span>
+        </div>
+      </div>
+
       <div id="prestadoresLista"></div>
     </div>
   </div>
@@ -1010,9 +1022,9 @@ input::placeholder{color:#404040;}
         </div>
         <div class="field"><label>Vehículo (marca y modelo)</label><input type="text" id="mpVehiculo" placeholder="Ej: Ford Transit Blanca"></div>
         <div class="field">
-          <label>URL del script de Drive (Google Apps Script)</label>
-          <input type="text" id="mpScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
-          <div style="font-size:10px;color:var(--muted);margin-top:4px;">Al pegar el Desglose PDF se subirá automáticamente a la carpeta Drive configurada en ese script.</div>
+          <label>ID de carpeta de Drive</label>
+          <input type="text" id="mpDriveFolderId" placeholder="Ej: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">Lo encontrás en la URL de la carpeta: drive.google.com/drive/folders/<strong style="color:var(--text);">ESTE_ES_EL_ID</strong></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
           <button onclick="cerrarModalPrestador()" style="padding:9px 18px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:Inter,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">Cancelar</button>
@@ -1302,9 +1314,22 @@ function renderPrestadorSelect() {
   if (prev) sel.value = prev;
 }
 
+const DRIVE_SCRIPT_KEY = 'avex-drive-script-url';
+function getDriveScriptUrl() { return localStorage.getItem(DRIVE_SCRIPT_KEY) || ''; }
+function guardarDriveScriptUrl() {
+  const val = document.getElementById('driveScriptUrlInput')?.value.trim() || '';
+  localStorage.setItem(DRIVE_SCRIPT_KEY, val);
+  const ok = document.getElementById('driveScriptUrlOk');
+  if (ok) { ok.style.display = 'inline'; setTimeout(() => ok.style.display = 'none', 2000); }
+}
+
 function renderPrestadoresLista() {
   const cont = document.getElementById('prestadoresLista');
   if (!cont) return;
+  // Cargar URL global del script
+  const scriptInput = document.getElementById('driveScriptUrlInput');
+  if (scriptInput) scriptInput.value = getDriveScriptUrl();
+
   const lista = getPrestadoresDB();
   if (!lista.length) {
     cont.innerHTML = `<div style="font-size:12px;color:var(--muted);text-align:center;padding:20px;">No hay prestadores cargados.</div>`;
@@ -1316,7 +1341,7 @@ function renderPrestadoresLista() {
       <div>
         <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;">${p.nombre}</div>
         <div style="font-size:11px;color:var(--muted);">${[p.vehiculo, p.patente].filter(Boolean).join(' · ')}${p.tel ? ' · ' + p.tel : ''}</div>
-        ${p.scriptUrl ? `<div style="font-size:10px;color:var(--accent);margin-top:2px;">✓ Drive configurado</div>` : `<div style="font-size:10px;color:var(--muted);margin-top:2px;">Sin Drive configurado</div>`}
+        ${p.driveFolderId ? `<div style="font-size:10px;color:var(--accent);margin-top:2px;">📁 Carpeta Drive configurada</div>` : `<div style="font-size:10px;color:var(--muted);margin-top:2px;">Sin carpeta Drive</div>`}
       </div>
       <div style="display:flex;gap:6px;">
         <button onclick="abrirModalPrestador('${p.id}')" style="padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">✏️ Editar</button>
@@ -1327,12 +1352,12 @@ function renderPrestadoresLista() {
 
 function abrirModalPrestador(id) {
   const p = id ? getPrestadorById(id) : null;
-  document.getElementById('mpId').value       = p ? p.id : '';
-  document.getElementById('mpNombre').value   = p ? p.nombre    : '';
-  document.getElementById('mpTel').value      = p ? p.tel       : '';
-  document.getElementById('mpVehiculo').value = p ? p.vehiculo  : '';
-  document.getElementById('mpPatente').value  = p ? p.patente   : '';
-  document.getElementById('mpScriptUrl').value= p ? (p.scriptUrl||'') : '';
+  document.getElementById('mpId').value            = p ? p.id : '';
+  document.getElementById('mpNombre').value        = p ? p.nombre   : '';
+  document.getElementById('mpTel').value           = p ? p.tel      : '';
+  document.getElementById('mpVehiculo').value      = p ? p.vehiculo : '';
+  document.getElementById('mpPatente').value       = p ? p.patente  : '';
+  document.getElementById('mpDriveFolderId').value = p ? (p.driveFolderId||'') : '';
   document.getElementById('modalPrestadorTitulo').textContent = p ? 'Editar prestador' : 'Nuevo prestador';
   document.getElementById('modalPrestador').style.display = 'flex';
   setTimeout(() => document.getElementById('mpNombre').focus(), 100);
@@ -1347,12 +1372,12 @@ function guardarPrestadorModal() {
   const lista = getPrestadoresDB();
   const existingId = document.getElementById('mpId').value;
   const entry = {
-    id:        existingId || slugify(nombre) + '-' + Date.now().toString(36),
+    id:            existingId || slugify(nombre) + '-' + Date.now().toString(36),
     nombre,
-    tel:       document.getElementById('mpTel').value.trim(),
-    vehiculo:  document.getElementById('mpVehiculo').value.trim(),
-    patente:   document.getElementById('mpPatente').value.trim(),
-    scriptUrl: document.getElementById('mpScriptUrl').value.trim(),
+    tel:           document.getElementById('mpTel').value.trim(),
+    vehiculo:      document.getElementById('mpVehiculo').value.trim(),
+    patente:       document.getElementById('mpPatente').value.trim(),
+    driveFolderId: document.getElementById('mpDriveFolderId').value.trim(),
   };
   if (existingId) {
     const idx = lista.findIndex(p => p.id === existingId);
@@ -2907,12 +2932,12 @@ async function descargarDesglose(id) {
     a.href = url; a.download = filename; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
 
-    // 2. Subir a Drive si hay script configurado
+    // 2. Subir a Drive si hay script + folder configurados
+    const scriptUrl    = getDriveScriptUrl();
     const prestadorNombre = v.prestadorNombre || '';
-    const lista = getPrestadoresDB();
-    const prest = lista.find(p => p.nombre === prestadorNombre);
-    const scriptUrl = prest?.scriptUrl?.trim();
-    if (!scriptUrl) return;
+    const prest        = getPrestadoresDB().find(p => p.nombre === prestadorNombre);
+    const folderId     = prest?.driveFolderId?.trim();
+    if (!scriptUrl || !folderId) return;
 
     // Mostrar toast "Subiendo a Drive..."
     let toast = document.getElementById('driveToast');
@@ -2938,7 +2963,7 @@ async function descargarDesglose(id) {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ file: base64, filename }),
+        body: JSON.stringify({ file: base64, filename, folderId }),
       });
       toast.textContent = '✓ Guardado en Drive';
       toast.style.color = 'var(--accent)';
