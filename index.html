@@ -731,7 +731,6 @@ input::placeholder{color:#404040;}
         <label>Prestador</label>
         <select id="prestadorSelect" onchange="seleccionarPrestador(this)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:11px 14px;border-radius:5px;outline:none;width:100%;">
           <option value="">— Seleccionar prestador —</option>
-          <option value="facundo">Facundo Ocampos</option>
           <option value="manual">+ Ingresar manualmente</option>
         </select>
       </div>
@@ -982,6 +981,47 @@ input::placeholder{color:#404040;}
     <div class="sec-tag" style="padding:14px 18px 0;">Vista previa del tarifario actual</div>
     <div style="padding:14px 18px;"><div id="tarifaPreview"></div></div>
   </div>
+
+  <!-- ── PRESTADORES ── -->
+  <div class="card" style="margin-top:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 0;">
+      <div class="sec-tag" style="margin-bottom:0;">Prestadores</div>
+      <button onclick="abrirModalPrestador(null)" style="padding:6px 14px;border-radius:5px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-family:'Inter',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">+ Agregar</button>
+    </div>
+    <div style="padding:14px 18px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Configurá los datos de cada prestador. El link de Drive (Google Apps Script) permite que el Desglose PDF se suba automáticamente a esa carpeta compartida.</div>
+      <div id="prestadoresLista"></div>
+    </div>
+  </div>
+
+  <!-- MODAL PRESTADOR -->
+  <div id="modalPrestador" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:500px;overflow:hidden;">
+      <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+        <div style="font-size:14px;font-weight:700;color:var(--text);" id="modalPrestadorTitulo">Nuevo prestador</div>
+        <button onclick="cerrarModalPrestador()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+        <input type="hidden" id="mpId">
+        <div class="field"><label>Nombre completo</label><input type="text" id="mpNombre" placeholder="Ej: Carlos Rodríguez"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field"><label>Teléfono / WhatsApp</label><input type="text" id="mpTel" placeholder="Ej: 11 5555-0000"></div>
+          <div class="field"><label>Patente</label><input type="text" id="mpPatente" placeholder="Ej: AC 456 EF" style="text-transform:uppercase;"></div>
+        </div>
+        <div class="field"><label>Vehículo (marca y modelo)</label><input type="text" id="mpVehiculo" placeholder="Ej: Ford Transit Blanca"></div>
+        <div class="field">
+          <label>URL del script de Drive (Google Apps Script)</label>
+          <input type="text" id="mpScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">Al pegar el Desglose PDF se subirá automáticamente a la carpeta Drive configurada en ese script.</div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
+          <button onclick="cerrarModalPrestador()" style="padding:9px 18px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:Inter,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">Cancelar</button>
+          <button onclick="guardarPrestadorModal()" style="padding:9px 20px;border-radius:5px;border:none;background:var(--accent);color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 </div>
 
@@ -1223,9 +1263,116 @@ function actualizarDireccion(tipo) {
 }
 
 // ── PRESTADORES ───────────────────────────────────────────────
-const PRESTADORES = {
+// ── PRESTADORES DB (localStorage) ────────────────────────────
+const PRESTADORES_LEGACY = {
   facundo: { nombre:'Facundo Ocampos', tel:'+54 9 11 3414-7841', vehiculo:'Mercedes Benz Vito', patente:'AE324GK' },
 };
+const PRESTADORES_KEY = 'avex-prestadores';
+
+function getPrestadoresDB() {
+  try {
+    const raw = localStorage.getItem(PRESTADORES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  // Primera vez: migrar desde legacy hardcoded
+  const migrated = Object.entries(PRESTADORES_LEGACY).map(([id, p]) => ({
+    id, nombre: p.nombre, tel: p.tel, vehiculo: p.vehiculo, patente: p.patente, scriptUrl: ''
+  }));
+  savePrestadoresDB(migrated);
+  return migrated;
+}
+function savePrestadoresDB(lista) {
+  localStorage.setItem(PRESTADORES_KEY, JSON.stringify(lista));
+}
+function getPrestadorById(id) {
+  return getPrestadoresDB().find(p => p.id === id) || null;
+}
+function slugify(str) {
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || Date.now().toString();
+}
+
+function renderPrestadorSelect() {
+  const sel = document.getElementById('prestadorSelect');
+  if (!sel) return;
+  const prev = sel.value;
+  const lista = getPrestadoresDB();
+  sel.innerHTML = `<option value="">— Seleccionar prestador —</option>` +
+    lista.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('') +
+    `<option value="manual">+ Ingresar manualmente</option>`;
+  if (prev) sel.value = prev;
+}
+
+function renderPrestadoresLista() {
+  const cont = document.getElementById('prestadoresLista');
+  if (!cont) return;
+  const lista = getPrestadoresDB();
+  if (!lista.length) {
+    cont.innerHTML = `<div style="font-size:12px;color:var(--muted);text-align:center;padding:20px;">No hay prestadores cargados.</div>`;
+    return;
+  }
+  const rowS = 'display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);';
+  cont.innerHTML = lista.map(p => `
+    <div style="${rowS}">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;">${p.nombre}</div>
+        <div style="font-size:11px;color:var(--muted);">${[p.vehiculo, p.patente].filter(Boolean).join(' · ')}${p.tel ? ' · ' + p.tel : ''}</div>
+        ${p.scriptUrl ? `<div style="font-size:10px;color:var(--accent);margin-top:2px;">✓ Drive configurado</div>` : `<div style="font-size:10px;color:var(--muted);margin-top:2px;">Sin Drive configurado</div>`}
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="abrirModalPrestador('${p.id}')" style="padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">✏️ Editar</button>
+        <button onclick="eliminarPrestadorDB('${p.id}')" style="padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:#EF4444;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function abrirModalPrestador(id) {
+  const p = id ? getPrestadorById(id) : null;
+  document.getElementById('mpId').value       = p ? p.id : '';
+  document.getElementById('mpNombre').value   = p ? p.nombre    : '';
+  document.getElementById('mpTel').value      = p ? p.tel       : '';
+  document.getElementById('mpVehiculo').value = p ? p.vehiculo  : '';
+  document.getElementById('mpPatente').value  = p ? p.patente   : '';
+  document.getElementById('mpScriptUrl').value= p ? (p.scriptUrl||'') : '';
+  document.getElementById('modalPrestadorTitulo').textContent = p ? 'Editar prestador' : 'Nuevo prestador';
+  document.getElementById('modalPrestador').style.display = 'flex';
+  setTimeout(() => document.getElementById('mpNombre').focus(), 100);
+}
+function cerrarModalPrestador() {
+  document.getElementById('modalPrestador').style.display = 'none';
+}
+function guardarPrestadorModal() {
+  const nombre = document.getElementById('mpNombre').value.trim();
+  if (!nombre) { document.getElementById('mpNombre').style.borderColor = 'var(--red)'; return; }
+  document.getElementById('mpNombre').style.borderColor = '';
+  const lista = getPrestadoresDB();
+  const existingId = document.getElementById('mpId').value;
+  const entry = {
+    id:        existingId || slugify(nombre) + '-' + Date.now().toString(36),
+    nombre,
+    tel:       document.getElementById('mpTel').value.trim(),
+    vehiculo:  document.getElementById('mpVehiculo').value.trim(),
+    patente:   document.getElementById('mpPatente').value.trim(),
+    scriptUrl: document.getElementById('mpScriptUrl').value.trim(),
+  };
+  if (existingId) {
+    const idx = lista.findIndex(p => p.id === existingId);
+    if (idx >= 0) lista[idx] = entry; else lista.push(entry);
+  } else {
+    lista.push(entry);
+  }
+  savePrestadoresDB(lista);
+  cerrarModalPrestador();
+  renderPrestadoresLista();
+  renderPrestadorSelect();
+}
+function eliminarPrestadorDB(id) {
+  if (!confirm('¿Eliminar este prestador?')) return;
+  const lista = getPrestadoresDB().filter(p => p.id !== id);
+  savePrestadoresDB(lista);
+  renderPrestadoresLista();
+  renderPrestadorSelect();
+}
+
 function seleccionarPrestador(sel) {
   const val = sel.value;
   const manualRow = document.getElementById('prestadorManualRow');
@@ -1236,13 +1383,15 @@ function seleccionarPrestador(sel) {
     document.getElementById('prestadorTelInput').value = '';
     document.getElementById('prestadorVehiculoInput').value = '';
     document.getElementById('prestadorPatenteInput').value = '';
-  } else if (val && PRESTADORES[val]) {
-    manualRow.style.display = 'none';
-    const p = PRESTADORES[val];
-    document.getElementById('prestadorNombreHidden').value = p.nombre;
-    document.getElementById('prestadorTelInput').value = p.tel;
-    document.getElementById('prestadorVehiculoInput').value = p.vehiculo;
-    document.getElementById('prestadorPatenteInput').value = p.patente;
+  } else if (val) {
+    const p = getPrestadorById(val);
+    if (p) {
+      manualRow.style.display = 'none';
+      document.getElementById('prestadorNombreHidden').value = p.nombre;
+      document.getElementById('prestadorTelInput').value = p.tel;
+      document.getElementById('prestadorVehiculoInput').value = p.vehiculo;
+      document.getElementById('prestadorPatenteInput').value = p.patente;
+    }
   } else {
     manualRow.style.display = 'none';
     document.getElementById('prestadorNombreHidden').value = '';
@@ -2750,12 +2899,54 @@ async function descargarDesglose(id) {
   cx.fillText('Generado por AVEX Traslados · ' + new Date().toLocaleDateString('es-AR'), CW/2, ry + 22);
   cx.textAlign = 'left';
 
-  // ── Descargar imagen ──────────────────────────────────────────
-  canvas.toBlob((blob) => {
+  // ── Descargar + subir a Drive ─────────────────────────────────
+  canvas.toBlob(async (blob) => {
+    // 1. Descargar siempre localmente
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+    // 2. Subir a Drive si hay script configurado
+    const prestadorNombre = v.prestadorNombre || '';
+    const lista = getPrestadoresDB();
+    const prest = lista.find(p => p.nombre === prestadorNombre);
+    const scriptUrl = prest?.scriptUrl?.trim();
+    if (!scriptUrl) return;
+
+    // Mostrar toast "Subiendo a Drive..."
+    let toast = document.getElementById('driveToast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'driveToast';
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1C1C1C;border:1px solid var(--border);color:var(--text);font-size:12px;font-weight:600;padding:10px 20px;border-radius:8px;z-index:99999;transition:opacity .3s;font-family:Inter,sans-serif;';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = '📤 Subiendo desglose a Drive...';
+    toast.style.opacity = '1';
+
+    try {
+      // Convertir blob a base64
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload  = () => res(reader.result.split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(blob);
+      });
+
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ file: base64, filename }),
+      });
+      toast.textContent = '✓ Guardado en Drive';
+      toast.style.color = 'var(--accent)';
+    } catch(e) {
+      toast.textContent = '⚠ No se pudo subir a Drive';
+      toast.style.color = '#EF4444';
+    }
+    setTimeout(() => { toast.style.opacity = '0'; }, 3500);
   }, 'image/jpeg', 0.95);
 }
 
@@ -2982,6 +3173,7 @@ function renderTarifario() {
   renderFilasTarifas();
   renderFilasZonas();
   renderPreviewTarifario();
+  renderPrestadoresLista();
 }
 function renderFilasTarifas() {
   const c = document.getElementById('tarifaRows');
@@ -4139,6 +4331,7 @@ async function init() {
   if(localStorage.getItem('avex-theme')==='light') toggleTheme();
   renderZonaPills();
   renderCalcTipoPills();
+  renderPrestadorSelect();
   actualizarContadorHistorial();
   setInterval(()=>{ if(viajeActivoId) actualizarMonitor(viajeActivoId); }, 3000);
 
