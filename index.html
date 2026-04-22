@@ -649,7 +649,32 @@ input::placeholder{color:#404040;}
     </div>
     <div class="fact-note" id="factNote" style="margin-top:8px;margin-bottom:16px;">Factura A: el IVA se suma al presupuesto y se descuenta en el desglose.</div>
 
-    <div class="sec-tag">04 — Origen y destino</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div class="sec-tag" style="margin-bottom:0;">04 — Origen y destino</div>
+      <button onclick="abrirModalMaps()" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--blue);color:var(--blue);padding:4px 12px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:5px;">🗺 Link de Maps</button>
+    </div>
+
+    <!-- MODAL LINK MAPS -->
+    <div id="mapsLinkOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20000;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:520px;overflow:hidden;">
+        <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);">🗺 Importar desde Google Maps</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px;">Pegá el link de cómo llegar de Google Maps</div>
+          </div>
+          <button onclick="cerrarModalMaps()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;">✕</button>
+        </div>
+        <div style="padding:20px;">
+          <input id="mapsLinkInput" type="text" placeholder="https://maps.google.com/maps/dir/..." style="width:100%;margin-bottom:12px;" oninput="this.style.borderColor=''">
+          <div id="mapsLinkStatus" style="font-size:12px;color:var(--muted);min-height:18px;margin-bottom:12px;"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="cerrarModalMaps()" style="padding:9px 18px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:Inter,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">Cancelar</button>
+            <button onclick="procesarLinkMaps()" style="padding:9px 20px;border-radius:5px;border:none;background:var(--blue);color:#fff;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Importar →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Origen</label>
       <button onclick="abrirMapaPicker('origen')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:4px;">📍 Elegir en mapa</button>
@@ -1446,6 +1471,147 @@ function confirmarPuntoMapa() {
 
 function cerrarMapaPicker() {
   document.getElementById('mapaPickerOverlay').style.display = 'none';
+}
+
+// ── IMPORTAR DESDE LINK DE MAPS ───────────────────────────────
+function abrirModalMaps() {
+  document.getElementById('mapsLinkInput').value = '';
+  document.getElementById('mapsLinkStatus').textContent = '';
+  document.getElementById('mapsLinkInput').style.borderColor = '';
+  document.getElementById('mapsLinkOverlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('mapsLinkInput').focus(), 100);
+}
+function cerrarModalMaps() {
+  document.getElementById('mapsLinkOverlay').style.display = 'none';
+}
+
+async function reverseGeocodeAddr(lat, lon) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=es`,
+      { headers: { 'User-Agent': 'AVEX-App/1.0' }, signal: AbortSignal.timeout(6000) }
+    );
+    const d = await res.json();
+    const addr = d.address || {};
+    const calle    = addr.road || addr.pedestrian || addr.footway || '';
+    const altura   = addr.house_number || '';
+    const localidad= addr.city || addr.town || addr.village || addr.suburb || addr.municipality || '';
+    const display  = d.display_name || [calle, altura, localidad].filter(Boolean).join(' ');
+    return { calle, altura, localidad, display };
+  } catch(e) {
+    return null;
+  }
+}
+
+function parsearUrlMaps(url) {
+  // Extrae origen y destino de una URL de Google Maps
+  // Retorna { origen, destino } donde cada uno es { text, lat, lon } o null
+  try {
+    const u = new URL(url);
+    const coordRe = /^(-?\d+\.?\d*),(-?\d+\.?\d*)$/;
+
+    // Formato 1: /maps/dir/Origen/Destino/
+    const dirMatch = u.pathname.match(/\/maps\/dir\/(.+)/);
+    if (dirMatch) {
+      const partes = dirMatch[1].split('/')
+        .map(p => decodeURIComponent(p.replace(/\+/g, ' ')).trim())
+        .filter(p => p && !p.startsWith('@') && p !== 'data');
+
+      if (partes.length >= 2) {
+        const parse = p => {
+          const m = p.match(coordRe);
+          if (m) return { text: null, lat: parseFloat(m[1]), lon: parseFloat(m[2]) };
+          return { text: p, lat: null, lon: null };
+        };
+        return { origen: parse(partes[0]), destino: parse(partes[1]) };
+      }
+    }
+
+    // Formato 2: ?saddr=X&daddr=Y (Maps clásico)
+    const saddr = u.searchParams.get('saddr');
+    const daddr = u.searchParams.get('daddr');
+    if (saddr || daddr) {
+      const parse = p => {
+        if (!p) return null;
+        const m = p.match(coordRe);
+        if (m) return { text: null, lat: parseFloat(m[1]), lon: parseFloat(m[2]) };
+        return { text: p, lat: null, lon: null };
+      };
+      return { origen: parse(saddr), destino: parse(daddr) };
+    }
+
+    return null;
+  } catch(e) { return null; }
+}
+
+async function poblarDesdeMaps(tipo, data) {
+  // data = { text, lat, lon }
+  if (!data) return;
+  let calle = '', altura = '', localidad = '';
+
+  if (data.lat !== null) {
+    // Tenemos coordenadas → reverse geocode
+    const r = await reverseGeocodeAddr(data.lat, data.lon);
+    if (r) { calle = r.calle; altura = r.altura; localidad = r.localidad; }
+    else { calle = `${data.lat}, ${data.lon}`; }
+    // Guardar coords para que calcularRuta las use directamente
+    window[`_${tipo}LatLon`] = { lat: data.lat, lon: data.lon };
+  } else if (data.text) {
+    // Tenemos texto → intentar dividir en calle / altura / localidad
+    // Ej: "Av. Corrientes 1234, Buenos Aires"
+    const parts = data.text.split(',').map(s => s.trim());
+    const calleAltura = parts[0] || '';
+    const locPart = parts.slice(1).join(', ');
+    // Separar altura del nombre de la calle
+    const altMatch = calleAltura.match(/^(.*?)\s+(\d+)\s*$/);
+    if (altMatch) { calle = altMatch[1]; altura = altMatch[2]; }
+    else { calle = calleAltura; }
+    localidad = locPart.replace(/,?\s*(Argentina|AR)$/i, '').trim();
+  }
+
+  document.getElementById(`${tipo}Calle`).value    = calle;
+  document.getElementById(`${tipo}Altura`).value   = altura;
+  document.getElementById(`${tipo}Localidad`).value= localidad;
+  actualizarDireccion(tipo);
+}
+
+async function procesarLinkMaps() {
+  const url = document.getElementById('mapsLinkInput').value.trim();
+  const status = document.getElementById('mapsLinkStatus');
+  const input  = document.getElementById('mapsLinkInput');
+
+  if (!url) { input.style.borderColor = 'var(--red)'; return; }
+
+  // Verificar que sea un link de Maps reconocible
+  if (!url.includes('google.com/maps') && !url.includes('maps.google') && !url.includes('goo.gl/maps') && !url.includes('maps.app.goo.gl')) {
+    status.style.color = 'var(--red)';
+    status.textContent = '⚠ No parece un link de Google Maps. Usá el link completo de "Cómo llegar".';
+    return;
+  }
+  if (url.includes('maps.app.goo.gl') || url.includes('goo.gl/maps')) {
+    status.style.color = 'var(--red)';
+    status.textContent = '⚠ Links cortos no soportados. En Maps, tocá ⋮ → Compartir → Copiar link, y usá el link largo.';
+    return;
+  }
+
+  const parsed = parsearUrlMaps(url);
+  if (!parsed || (!parsed.origen && !parsed.destino)) {
+    status.style.color = 'var(--red)';
+    status.textContent = '⚠ No se pudo leer el origen/destino. Asegurate de compartir la ruta (Cómo llegar), no solo un lugar.';
+    return;
+  }
+
+  status.style.color = 'var(--muted)';
+  status.textContent = '🔍 Obteniendo direcciones...';
+
+  await Promise.all([
+    parsed.origen  ? poblarDesdeMaps('origen',  parsed.origen)  : Promise.resolve(),
+    parsed.destino ? poblarDesdeMaps('destino', parsed.destino) : Promise.resolve(),
+  ]);
+
+  status.textContent = '✓ Listo';
+  status.style.color = 'var(--accent)';
+  setTimeout(() => cerrarModalMaps(), 700);
 }
 
 // ── ZONA ──────────────────────────────────────────────────────
