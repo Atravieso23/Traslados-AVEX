@@ -503,6 +503,7 @@ input::placeholder{color:#404040;}
 .liq-cobro-pill{font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
 .liq-cobro-pill.efectivo{background:#1a1a0a;color:var(--orange);border:1px solid var(--orange);}
 .liq-cobro-pill.transferencia{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue);}
+.liq-cobro-pill.aseguradora{background:#1a0d2e;color:#A78BFA;border:1px solid #A78BFA;}
 .liq-accion-pill{font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
 .liq-accion-pill.cobrar{background:var(--red-dim,#450a0a);color:#EF4444;border:1px solid #EF4444;}
 .liq-accion-pill.pagar{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);}
@@ -2355,17 +2356,25 @@ function renderHistorial(){
           ${v.estado !== 'cancelado' ? `<button class="hist-btn" onclick="cancelarViaje('${v.id}')" style="border-color:#EF4444;color:#EF4444;">✕ Cancelar</button>` : ''}
           <button class="hist-btn danger" onclick="eliminarViaje('${v.id}')">🗑 Eliminar</button>
           ${rolActual === 'admin@avex.com' ? `
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-            <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">Estado:</span>
-            <select onchange="cambiarEstadoAdmin('${v.id}', this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px;padding:6px 10px;border-radius:6px;outline:none;cursor:pointer;">
-              <option value="pendiente"     ${v.estado==='pendiente'     ?'selected':''}>Pendiente</option>
-              <option value="en-camino"     ${v.estado==='en-camino'     ?'selected':''}>En camino</option>
-              <option value="en-origen"     ${v.estado==='en-origen'     ?'selected':''}>En origen</option>
-              <option value="en-destino"    ${v.estado==='en-destino'    ?'selected':''}>En destino</option>
-              <option value="cobro"         ${v.estado==='cobro'         ?'selected':''}>Cobro</option>
-              <option value="completado"    ${v.estado==='completado'    ?'selected':''}>Completado</option>
-              <option value="cancelado"     ${v.estado==='cancelado'     ?'selected':''}>Cancelado</option>
-            </select>
+          <div style="display:flex;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:160px;">
+              <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">Estado:</span>
+              <select onchange="cambiarEstadoAdmin('${v.id}', this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px;padding:6px 10px;border-radius:6px;outline:none;cursor:pointer;">
+                <option value="pendiente"     ${v.estado==='pendiente'     ?'selected':''}>Pendiente</option>
+                <option value="en-camino"     ${v.estado==='en-camino'     ?'selected':''}>En camino</option>
+                <option value="en-origen"     ${v.estado==='en-origen'     ?'selected':''}>En origen</option>
+                <option value="en-destino"    ${v.estado==='en-destino'    ?'selected':''}>En destino</option>
+                <option value="cobro"         ${v.estado==='cobro'         ?'selected':''}>Cobro</option>
+                <option value="completado"    ${v.estado==='completado'    ?'selected':''}>Completado</option>
+                <option value="cancelado"     ${v.estado==='cancelado'     ?'selected':''}>Cancelado</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:160px;">
+              <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">Tipo:</span>
+              <select onchange="cambiarTipoViaje('${v.id}', this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px;padding:6px 10px;border-radius:6px;outline:none;cursor:pointer;">
+                ${getTiposTarifario().map(t=>`<option value="${t.key}" ${(v.tipoServicio||'particular')===t.key?'selected':''}>${t.emoji} ${t.label}</option>`).join('')}
+              </select>
+            </div>
           </div>` : ''}
         </div>
         ${(v.fotoOrigen||v.fotoDestino)?`
@@ -2398,6 +2407,15 @@ async function cambiarEstadoAdmin(viajeId, nuevoEstado) {
   await guardarEnHistorial(v);
   // También actualizar viajes_activos para que el sync no lo pise
   await guardarViajeActivo(v);
+  renderHistorial();
+}
+
+async function cambiarTipoViaje(viajeId, nuevoTipo) {
+  const idx = _historialCache.findIndex(v => v.id === viajeId);
+  if (idx < 0) return;
+  _historialCache[idx].tipoServicio = nuevoTipo;
+  await guardarEnHistorial(_historialCache[idx]);
+  await guardarViajeActivo(_historialCache[idx]);
   renderHistorial();
 }
 
@@ -3350,9 +3368,9 @@ function renderLiquidaciones(){
     const cancelado = v.estado === 'cancelado';
     gTotalFact+=(v.total||0);
     gIva+=(v.montoIva||0);
-    gRevAvex  += cancelado ? (v.montoAvexCancelado||0)      : (v.montoAvex||0);
-    gRevPrest += cancelado ? (v.montoPrestadorCancelado||0) : (v.montoPrestador||0);
-    gMovida   += cancelado ? 0 : (v.montoMovida||0);
+    gRevAvex  += cancelado ? (v.montoAvexCancelado||0) : (v.montoAvex||0);
+    gRevPrest += cancelado ? 0                         : (v.montoPrestador||0);
+    gMovida   += cancelado ? (v.montoPrestadorCancelado||0) : (v.montoMovida||0);
   });
   const gTotalPrest = gRevPrest + gMovida;
 
@@ -3378,8 +3396,8 @@ function renderLiquidaciones(){
 
     vjs.forEach(v=>{
       const cancelado=v.estado==='cancelado';
-      const movida=cancelado?0:(v.montoMovida||0);
-      const revPrest=cancelado?(v.montoPrestadorCancelado||0):(v.montoPrestador||0);
+      const movida  =cancelado?(v.montoPrestadorCancelado||0):(v.montoMovida||0);
+      const revPrest=cancelado?0:(v.montoPrestador||0);
       const revAvex =cancelado?(v.montoAvexCancelado||0):(v.montoAvex||0);
       totalFact    +=(v.total||0);
       totalIva     +=(v.montoIva||0);
@@ -3391,6 +3409,7 @@ function renderLiquidaciones(){
         revPrestEfectivo+=revPrest;
         movPrest       +=movida;
       } else {
+        // transferencia O aseguradora → AVEX cobró
         cobradoAvex  +=(v.total||0);
         revAvexTransf+=revPrest;
         movAvex      +=movida;
@@ -3429,22 +3448,30 @@ function renderLiquidaciones(){
       const fecha=v.createdAt?new Date(v.createdAt).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}):'—';
       const iva=v.montoIva||0;
       const base=(v.total||0)-iva;
-      const revPrest=cancelado?(v.montoPrestadorCancelado||0):(v.montoPrestador||0);
+      const revPrest=cancelado?0:(v.montoPrestador||0);
       const revAvex =cancelado?(v.montoAvexCancelado||0):(v.montoAvex||0);
-      const movida  =cancelado?0:(v.montoMovida||0);
+      const movida  =cancelado?(v.montoPrestadorCancelado||0):(v.montoMovida||0);
       const esCash=v.formaCobro==='efectivo';
+      const esAseg=v.formaCobro==='aseguradora';
+      const cobroPillLabel=esCash?'💵 Efectivo':esAseg?'🏥 Aseguradora':'🏦 Transf.';
       const cancBadge=cancelado?`<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.8px;background:#2d0a0a;color:#EF4444;border:1px solid #EF4444;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;">CANC.</span>`:'';
       const rowOpacity=cancelado?'opacity:.75;':'';
-      return `<tr style="${rowOpacity}">
+      const rowAmount=revPrest+movida; // total a pagar al prestador por este viaje
+      return `<tr style="${rowOpacity}" data-viajeid="${v.id}" data-amount="${rowAmount}">
+        <td style="${tdStyle}">
+          <input type="checkbox" class="liq-check" data-id="${v.id}" data-amount="${rowAmount}" data-card="${id}"
+            onchange="liqUpdateSel('${id}')"
+            style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);">
+        </td>
         <td style="${tdStyle}color:var(--text);">${fecha}${cancBadge}</td>
         <td style="${tdStyle}font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);">${(v.origen||'').split(',')[0]} → ${(v.destino||'').split(',')[0]}</td>
         <td style="${tdStyle}font-weight:600;color:${cancelado?'var(--muted)':'var(--text)'};text-align:right;${cancelado?'text-decoration:line-through;':''}">${fmt(v.total)}</td>
         <td style="${tdStyle}color:#A78BFA;font-weight:600;text-align:right;">${iva>0?fmt(iva):'—'}</td>
         <td style="${tdStyle}color:var(--muted);text-align:right;">${fmt(base)}</td>
         <td style="${tdStyle}color:var(--orange,#F59E0B);font-weight:600;text-align:right;">${movida>0?fmt(movida):'—'}</td>
-        <td style="${tdStyle}color:var(--accent);font-weight:600;text-align:right;">${fmt(revPrest)}</td>
+        <td style="${tdStyle}color:var(--accent);font-weight:600;text-align:right;">${revPrest>0?fmt(revPrest):'—'}</td>
         <td style="${tdStyle}color:var(--blue);font-weight:600;text-align:right;">${fmt(revAvex)}</td>
-        <td style="${tdStyle}text-align:center;"><span class="liq-cobro-pill ${v.formaCobro||''}">${esCash?'💵 Efectivo':'🏦 Transf.'}</span></td>
+        <td style="${tdStyle}text-align:center;"><span class="liq-cobro-pill ${v.formaCobro||''}">${cobroPillLabel}</span></td>
       </tr>`;
     }).join('');
 
@@ -3521,6 +3548,11 @@ function renderLiquidaciones(){
         <table style="width:100%;border-collapse:collapse;">
           <thead>
             <tr>
+              <th style="${thStyle}color:var(--muted);width:30px;">
+                <input type="checkbox" title="Seleccionar todos"
+                  onchange="liqToggleAll('${id}', this.checked)"
+                  style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);">
+              </th>
               <th style="${thStyle}color:var(--muted);">Fecha</th>
               <th style="${thStyle}color:var(--muted);text-align:left;">Recorrido</th>
               <th style="${thStyle}color:var(--muted);text-align:right;">Total</th>
@@ -3535,6 +3567,10 @@ function renderLiquidaciones(){
           <tbody>${filas}</tbody>
         </table>
         </div>
+        <div id="liq-sel-bar-${id}" style="display:none;margin-top:10px;background:rgba(34,197,94,.1);border:1px solid var(--accent);border-radius:6px;padding:10px 14px;align-items:center;justify-content:space-between;gap:10px;">
+          <span style="font-size:13px;color:var(--muted);">Seleccionados: <span id="liq-sel-count-${id}" style="font-weight:700;color:var(--text);">0</span> viajes</span>
+          <span style="font-size:15px;font-weight:700;color:var(--accent);" id="liq-sel-monto-${id}">$ 0</span>
+        </div>
         ${resumenHTML}
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
           <button class="liq-print-btn" onclick="imprimirLiquidacion(this)">🖨️ Imprimir liquidación de ${nombre.split(' ')[0]}</button>
@@ -3544,13 +3580,21 @@ function renderLiquidaciones(){
             onclick="exportarLiquidacionPrestadorCSV(this)">
             ⬇ Exportar CSV
           </button>
-          <button class="liq-print-btn" style="border-color:var(--accent);color:var(--accent);"
+          <button id="liq-btn-all-${id}" class="liq-print-btn" style="border-color:var(--accent);color:var(--accent);"
             data-liq-nombre="${nombre.replace(/"/g,'&quot;')}"
             data-liq-ids="${vjs.map(v=>v.id).join(',')}"
             data-liq-monto="${Math.abs(neto)}"
             data-liq-tipo="${saldoClass}"
             onclick="confirmarLiquidacionBtn(this)">
             ✅ Marcar como liquidado · ${saldoMonto}
+          </button>
+          <button id="liq-btn-sel-${id}" class="liq-print-btn" style="display:none;border-color:#F59E0B;color:#F59E0B;"
+            data-liq-nombre="${nombre.replace(/"/g,'&quot;')}"
+            data-liq-ids=""
+            data-liq-monto="0"
+            data-liq-tipo="${saldoClass}"
+            onclick="confirmarLiquidacionBtn(this)">
+            ✅ Liquidar seleccionados · $ 0
           </button>
         </div>
       </div>
@@ -3654,6 +3698,39 @@ function exportarLiquidacionPrestadorCSV(btn) {
   a.download = `avex-liquidacion-${nombre.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function liqUpdateSel(cardId){
+  const checks=[...document.querySelectorAll(`.liq-check[data-card="${cardId}"]`)];
+  const checked=checks.filter(c=>c.checked);
+  const bar=document.getElementById(`liq-sel-bar-${cardId}`);
+  const selBtn=document.getElementById(`liq-btn-sel-${cardId}`);
+  const allBtn=document.getElementById(`liq-btn-all-${cardId}`);
+  if(!bar)return;
+  if(checked.length===0){
+    bar.style.display='none';
+    if(selBtn)selBtn.style.display='none';
+    if(allBtn)allBtn.style.display='';
+    return;
+  }
+  const total=checked.reduce((s,c)=>s+parseFloat(c.dataset.amount||0),0);
+  const ids=checked.map(c=>c.dataset.id).join(',');
+  document.getElementById(`liq-sel-count-${cardId}`).textContent=checked.length;
+  document.getElementById(`liq-sel-monto-${cardId}`).textContent='$ '+Math.round(total).toLocaleString('es-AR');
+  bar.style.display='flex';
+  if(selBtn){
+    selBtn.style.display='';
+    selBtn.dataset.liqIds=ids;
+    selBtn.dataset.liqMonto=Math.round(total);
+    selBtn.textContent='✅ Liquidar seleccionados · $ '+Math.round(total).toLocaleString('es-AR');
+  }
+  if(allBtn)allBtn.style.display='none';
+}
+
+function liqToggleAll(cardId, checked){
+  const boxes=[...document.querySelectorAll(`.liq-check[data-card="${cardId}"]`)];
+  boxes.forEach(c=>c.checked=checked);
+  liqUpdateSel(cardId);
 }
 
 function confirmarLiquidacionBtn(btn){
@@ -4075,7 +4152,7 @@ async function pConfirmarCobro() {
 
 async function pConfirmarCobroClaims() {
   pViaje.estado = 'completado';
-  pViaje.formaCobro = pViaje.tipoServicio || 'seguro';
+  pViaje.formaCobro = 'aseguradora';
   pViaje.timestamps = pViaje.timestamps || {};
   pViaje.timestamps.completado = Date.now();
   await pGuardar(); await guardarEnHistorial(pViaje); pRender();
