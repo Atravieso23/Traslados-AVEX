@@ -2536,7 +2536,7 @@ function corregirViaje(id) {
       </div>
 
       ${seccion('📅', 'Fecha y hora', 'fecha',
-        campo('Fecha y hora', 'ce_fecha', v.createdAt ? new Date(v.createdAt).toISOString().slice(0,16) : '', 'datetime-local'),
+        campo('Fecha y hora', 'ce_fecha', v.createdAt ? (()=>{ const d=new Date(v.createdAt); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); })() : '', 'datetime-local'),
         false
       )}
 
