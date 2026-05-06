@@ -1119,6 +1119,37 @@ input::placeholder{color:#404040;}
   </div>
 </div>
 
+<!-- MODAL CANCELACIÓN -->
+<div id="modalCancelacion" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:400px;padding:24px;font-family:Inter,sans-serif;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div style="font-size:15px;font-weight:700;color:#EF4444;">✕ Cancelar servicio</div>
+      <button onclick="cerrarModalCancelacion()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;">✕</button>
+    </div>
+    <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:var(--text);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--muted);">Tarifa base (sin IVA)</span><span id="mc-base" style="font-weight:700;">$ 0</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Movida original</span><span id="mc-movida-orig" style="color:#F59E0B;font-weight:600;">$ 0</span></div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">¿Cuánto se lleva el prestador?</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+        <button onclick="mcSetMonto('movida')" style="padding:5px 10px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid #F59E0B;color:#F59E0B;background:transparent;cursor:pointer;">Solo la movida</button>
+        <button onclick="mcSetMonto(0)" style="padding:5px 10px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);background:transparent;cursor:pointer;">$ 0 — no salió</button>
+      </div>
+      <input type="number" id="mc-monto-prest" min="0" oninput="mcRecalc()"
+        style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-weight:700;">
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:18px;">
+      <span style="color:var(--muted);">AVEX se lleva</span>
+      <span id="mc-avex" style="font-weight:700;color:var(--blue);">$ 0</span>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="cerrarModalCancelacion()" style="flex:1;padding:10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;">Volver</button>
+      <button onclick="confirmarCancelacion()" style="flex:1;padding:10px;border-radius:6px;border:none;background:#EF4444;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Confirmar cancelación</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL PRESUPUESTO -->
 <div id="modalOverlay">
   <div id="modalBox">
@@ -2419,18 +2450,55 @@ async function cambiarTipoViaje(viajeId, nuevoTipo) {
   renderHistorial();
 }
 
-async function cancelarViaje(id) {
-  if (!confirm('¿Cancelar este servicio?\n\nAVEX se lleva: tarifa base − movida\nPrestador se lleva: solo la movida')) return;
-  const idx = _historialCache.findIndex(v => v.id === id);
-  if (idx < 0) return;
-  const v = _historialCache[idx];
+let _cancelViajeId = null;
+
+function cancelarViaje(id) {
+  const v = _historialCache.find(x => x.id === id);
+  if (!v) return;
+  _cancelViajeId = id;
   const baseReal = (v.total || 0) - (v.montoIva || 0);
   const movida   = v.montoMovida || 0;
-  v.estado                    = 'cancelado';
-  v.montoAvexCancelado        = baseReal - movida;
-  v.montoPrestadorCancelado   = movida;
+  document.getElementById('mc-base').textContent        = fmt(baseReal);
+  document.getElementById('mc-movida-orig').textContent = fmt(movida);
+  document.getElementById('mc-monto-prest').value       = movida;
+  document.getElementById('mc-monto-prest').dataset.base   = baseReal;
+  document.getElementById('mc-monto-prest').dataset.movida = movida;
+  mcRecalc();
+  document.getElementById('modalCancelacion').style.display = 'flex';
+}
+
+function cerrarModalCancelacion() {
+  document.getElementById('modalCancelacion').style.display = 'none';
+  _cancelViajeId = null;
+}
+
+function mcSetMonto(val) {
+  const inp = document.getElementById('mc-monto-prest');
+  inp.value = val === 'movida' ? (inp.dataset.movida || 0) : 0;
+  mcRecalc();
+}
+
+function mcRecalc() {
+  const inp  = document.getElementById('mc-monto-prest');
+  const base = parseFloat(inp.dataset.base || 0);
+  const mont = parseFloat(inp.value) || 0;
+  document.getElementById('mc-avex').textContent = fmt(Math.max(0, base - mont));
+}
+
+async function confirmarCancelacion() {
+  if (!_cancelViajeId) return;
+  const idx = _historialCache.findIndex(v => v.id === _cancelViajeId);
+  if (idx < 0) return;
+  const v        = _historialCache[idx];
+  const inp      = document.getElementById('mc-monto-prest');
+  const base     = parseFloat(inp.dataset.base || 0);
+  const montPrest = parseFloat(inp.value) || 0;
+  v.estado                   = 'cancelado';
+  v.montoAvexCancelado       = Math.max(0, base - montPrest);
+  v.montoPrestadorCancelado  = montPrest;
   if (!v.timestamps) v.timestamps = {};
   v.timestamps.cancelado = Date.now();
+  cerrarModalCancelacion();
   await guardarEnHistorial(v);
   await guardarViajeActivo(v);
   renderHistorial();
