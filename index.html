@@ -1121,10 +1121,10 @@ input::placeholder{color:#404040;}
 
 <!-- MODAL CANCELACIÓN -->
 <div id="modalCancelacion" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20000;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:400px;padding:24px;font-family:Inter,sans-serif;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:420px;padding:24px;font-family:Inter,sans-serif;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
       <div style="font-size:15px;font-weight:700;color:#EF4444;">✕ Cancelar servicio</div>
-      <button onclick="cerrarModalCancelacion()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;">✕</button>
+      <div onclick="cerrarModalCancelacion()" style="border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;">✕</div>
     </div>
     <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:var(--text);">
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--muted);">Tarifa base (sin IVA)</span><span id="mc-base" style="font-weight:700;">$ 0</span></div>
@@ -1132,20 +1132,33 @@ input::placeholder{color:#404040;}
     </div>
     <div style="margin-bottom:14px;">
       <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">¿Cuánto se lleva el prestador?</div>
-      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
-        <button onclick="mcSetMonto('movida')" style="padding:5px 10px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid #F59E0B;color:#F59E0B;background:transparent;cursor:pointer;">Solo la movida</button>
-        <button onclick="mcSetMonto(0)" style="padding:5px 10px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);background:transparent;cursor:pointer;">$ 0 — no salió</button>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+        <div onclick="mcSetPct(0)"       style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">0% — no salió</div>
+        <div onclick="mcSetPct(50)"      style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">50%</div>
+        <div onclick="mcSetPct(100)"     style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">100%</div>
+        <div onclick="mcSetPct('movida')" style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid #F59E0B;color:#F59E0B;cursor:pointer;user-select:none;">Solo movida</div>
       </div>
-      <input type="number" id="mc-monto-prest" min="0" oninput="mcRecalc()"
-        style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-weight:700;">
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div style="width:90px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">% del viaje</div>
+          <input type="number" id="mc-pct" min="0" max="100" step="0.1" oninput="mcFromPct()"
+            style="width:100%;box-sizing:border-box;padding:9px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;text-align:center;">
+        </div>
+        <div style="color:var(--muted);font-size:18px;padding-bottom:9px;">→</div>
+        <div style="flex:1;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">$ al prestador</div>
+          <input type="number" id="mc-monto-prest" min="0" oninput="mcFromMonto()"
+            style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;">
+        </div>
+      </div>
     </div>
     <div style="display:flex;justify-content:space-between;font-size:13px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:18px;">
       <span style="color:var(--muted);">AVEX se lleva</span>
       <span id="mc-avex" style="font-weight:700;color:var(--blue);">$ 0</span>
     </div>
     <div style="display:flex;gap:8px;">
-      <button onclick="cerrarModalCancelacion()" style="flex:1;padding:10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;">Volver</button>
-      <button onclick="confirmarCancelacion()" style="flex:1;padding:10px;border-radius:6px;border:none;background:#EF4444;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Confirmar cancelación</button>
+      <div onclick="cerrarModalCancelacion()" style="flex:1;padding:10px;border-radius:6px;border:1px solid var(--border);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;text-align:center;user-select:none;">Volver</div>
+      <div onclick="confirmarCancelacion()" style="flex:1;padding:10px;border-radius:6px;background:#EF4444;color:#fff;font-size:13px;font-weight:700;cursor:pointer;text-align:center;user-select:none;">Confirmar cancelación</div>
     </div>
   </div>
 </div>
@@ -2458,12 +2471,15 @@ function cancelarViaje(id) {
   _cancelViajeId = id;
   const baseReal = (v.total || 0) - (v.montoIva || 0);
   const movida   = v.montoMovida || 0;
+  const pctMovida = baseReal > 0 ? Math.round(movida / baseReal * 100) : 0;
   document.getElementById('mc-base').textContent        = fmt(baseReal);
   document.getElementById('mc-movida-orig').textContent = fmt(movida);
-  document.getElementById('mc-monto-prest').value       = movida;
-  document.getElementById('mc-monto-prest').dataset.base   = baseReal;
-  document.getElementById('mc-monto-prest').dataset.movida = movida;
-  mcRecalc();
+  const montInp = document.getElementById('mc-monto-prest');
+  montInp.dataset.base   = baseReal;
+  montInp.dataset.movida = movida;
+  montInp.value          = movida;
+  document.getElementById('mc-pct').value = pctMovida;
+  mcUpdateAvex();
   document.getElementById('modalCancelacion').style.display = 'flex';
 }
 
@@ -2472,30 +2488,60 @@ function cerrarModalCancelacion() {
   _cancelViajeId = null;
 }
 
-function mcSetMonto(val) {
-  const inp = document.getElementById('mc-monto-prest');
-  inp.value = val === 'movida' ? (inp.dataset.movida || 0) : 0;
-  mcRecalc();
+function mcSetPct(val) {
+  const montInp = document.getElementById('mc-monto-prest');
+  const base    = parseFloat(montInp.dataset.base || 0);
+  let pct;
+  if (val === 'movida') {
+    const movida = parseFloat(montInp.dataset.movida || 0);
+    montInp.value = movida;
+    pct = base > 0 ? Math.round(movida / base * 100) : 0;
+  } else {
+    pct = val;
+    montInp.value = Math.round(base * pct / 100);
+  }
+  document.getElementById('mc-pct').value = pct;
+  mcUpdateAvex();
 }
 
-function mcRecalc() {
-  const inp  = document.getElementById('mc-monto-prest');
-  const base = parseFloat(inp.dataset.base || 0);
-  const mont = parseFloat(inp.value) || 0;
+function mcFromPct() {
+  const pct     = parseFloat(document.getElementById('mc-pct').value) || 0;
+  const montInp = document.getElementById('mc-monto-prest');
+  const base    = parseFloat(montInp.dataset.base || 0);
+  montInp.value = Math.round(base * pct / 100);
+  mcUpdateAvex();
+}
+
+function mcFromMonto() {
+  const montInp = document.getElementById('mc-monto-prest');
+  const base    = parseFloat(montInp.dataset.base || 0);
+  const mont    = parseFloat(montInp.value) || 0;
+  document.getElementById('mc-pct').value = base > 0 ? (mont / base * 100).toFixed(1) : 0;
+  mcUpdateAvex();
+}
+
+function mcUpdateAvex() {
+  const montInp = document.getElementById('mc-monto-prest');
+  const base    = parseFloat(montInp.dataset.base || 0);
+  const mont    = parseFloat(montInp.value) || 0;
   document.getElementById('mc-avex').textContent = fmt(Math.max(0, base - mont));
 }
+
+function mcRecalc() { mcFromMonto(); } // compatibilidad
 
 async function confirmarCancelacion() {
   if (!_cancelViajeId) return;
   const idx = _historialCache.findIndex(v => v.id === _cancelViajeId);
   if (idx < 0) return;
-  const v        = _historialCache[idx];
-  const inp      = document.getElementById('mc-monto-prest');
-  const base     = parseFloat(inp.dataset.base || 0);
-  const montPrest = parseFloat(inp.value) || 0;
+  const v         = _historialCache[idx];
+  const montInp   = document.getElementById('mc-monto-prest');
+  const base      = parseFloat(montInp.dataset.base || 0);
+  const montPrest = parseFloat(montInp.value) || 0;
+  const pct       = parseFloat(document.getElementById('mc-pct').value) || 0;
   v.estado                   = 'cancelado';
   v.montoAvexCancelado       = Math.max(0, base - montPrest);
   v.montoPrestadorCancelado  = montPrest;
+  v.pctCancelacion           = Math.round(pct * 10) / 10; // 1 decimal
   if (!v.timestamps) v.timestamps = {};
   v.timestamps.cancelado = Date.now();
   cerrarModalCancelacion();
@@ -3522,9 +3568,18 @@ function renderLiquidaciones(){
       const esCash=v.formaCobro==='efectivo';
       const esAseg=v.formaCobro==='aseguradora';
       const cobroPillLabel=esCash?'💵 Efectivo':esAseg?'🏥 Aseguradora':'🏦 Transf.';
-      const cancBadge=cancelado?`<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.8px;background:#2d0a0a;color:#EF4444;border:1px solid #EF4444;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;">CANC.</span>`:'';
-      const rowOpacity=cancelado?'opacity:.75;':'';
+      const pctCanc = cancelado && v.pctCancelacion != null ? v.pctCancelacion : null;
+      const hasPctDesc = pctCanc !== null && pctCanc < 100;
+      const cancBadge = cancelado
+        ? `<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.8px;background:#2d0a0a;color:#EF4444;border:1px solid #EF4444;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;">CANC.</span>`
+          + (hasPctDesc ? `<span style="display:inline-block;font-size:9px;font-weight:700;background:rgba(239,68,68,.12);color:#EF4444;border-radius:4px;padding:1px 5px;margin-left:3px;vertical-align:middle;">📉 ${pctCanc}%</span>` : '')
+        : '';
+      const rowOpacity=cancelado?'opacity:.8;':'';
       const rowAmount=revPrest+movida; // total a pagar al prestador por este viaje
+      // Base col: si hay descuento, mostrar base original tachada + % aplicado
+      const baseDisplay = hasPctDesc
+        ? `<span style="text-decoration:line-through;color:var(--muted);font-size:10px;">${fmt(base)}</span><br><span style="color:#EF4444;font-size:10px;font-weight:700;">${pctCanc}%</span>`
+        : fmt(base);
       return `<tr style="${rowOpacity}" data-viajeid="${v.id}" data-amount="${rowAmount}">
         <td style="${tdStyle}">
           <input type="checkbox" class="liq-check" data-id="${v.id}" data-amount="${rowAmount}" data-card="${id}"
@@ -3535,7 +3590,7 @@ function renderLiquidaciones(){
         <td style="${tdStyle}font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);">${(v.origen||'').split(',')[0]} → ${(v.destino||'').split(',')[0]}</td>
         <td style="${tdStyle}font-weight:600;color:${cancelado?'var(--muted)':'var(--text)'};text-align:right;${cancelado?'text-decoration:line-through;':''}">${fmt(v.total)}</td>
         <td style="${tdStyle}color:#A78BFA;font-weight:600;text-align:right;">${iva>0?fmt(iva):'—'}</td>
-        <td style="${tdStyle}color:var(--muted);text-align:right;">${fmt(base)}</td>
+        <td style="${tdStyle}color:var(--muted);text-align:right;">${baseDisplay}</td>
         <td style="${tdStyle}color:var(--orange,#F59E0B);font-weight:600;text-align:right;">${movida>0?fmt(movida):'—'}</td>
         <td style="${tdStyle}color:var(--accent);font-weight:600;text-align:right;">${revPrest>0?fmt(revPrest):'—'}</td>
         <td style="${tdStyle}color:var(--blue);font-weight:600;text-align:right;">${fmt(revAvex)}</td>
