@@ -1124,34 +1124,50 @@ input::placeholder{color:#404040;}
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:420px;padding:24px;font-family:Inter,sans-serif;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
       <div style="font-size:15px;font-weight:700;color:#EF4444;">✕ Cancelar servicio</div>
-      <div onclick="cerrarModalCancelacion()" style="border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;">✕</div>
+      <div onclick="cerrarModalCancelacion()" style="border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;user-select:none;">✕</div>
     </div>
-    <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:var(--text);">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--muted);">Tarifa base (sin IVA)</span><span id="mc-base" style="font-weight:700;">$ 0</span></div>
+
+    <!-- Info del viaje -->
+    <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="color:var(--muted);">Tarifa base (sin IVA)</span><span id="mc-base" style="font-weight:700;color:var(--text);">$ 0</span></div>
       <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Movida original</span><span id="mc-movida-orig" style="color:#F59E0B;font-weight:600;">$ 0</span></div>
     </div>
-    <div style="margin-bottom:14px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">¿Cuánto se lleva el prestador?</div>
-      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-        <div onclick="mcSetPct(0)"       style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">0% — no salió</div>
-        <div onclick="mcSetPct(50)"      style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">50%</div>
-        <div onclick="mcSetPct(100)"     style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">100%</div>
-        <div onclick="mcSetPct('movida')" style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid #F59E0B;color:#F59E0B;cursor:pointer;user-select:none;">Solo movida</div>
+
+    <!-- SECCIÓN 1: descuento en tarifa base (NUEVO) -->
+    <div style="margin-bottom:16px;padding:14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">📉 Descuento en tarifa base <span style="font-weight:400;opacity:.6;">(opcional)</span></div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+        <div onclick="mcSetDescuento(100)" style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">Sin descuento</div>
+        <div onclick="mcSetDescuento(75)"  style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">75%</div>
+        <div onclick="mcSetDescuento(50)"  style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">50%</div>
+        <div onclick="mcSetDescuento(25)"  style="padding:5px 11px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;">25%</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:flex-end;">
-        <div style="width:90px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">% del viaje</div>
-          <input type="number" id="mc-pct" min="0" max="100" step="0.1" oninput="mcFromPct()"
-            style="width:100%;box-sizing:border-box;padding:9px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;text-align:center;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="flex:1;position:relative;">
+          <input type="number" id="mc-pct-desc" min="0" max="100" step="1" value="100" oninput="mcUpdateAll()"
+            style="width:100%;box-sizing:border-box;padding:9px 36px 9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:15px;font-weight:700;">
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;font-weight:700;">%</span>
         </div>
-        <div style="color:var(--muted);font-size:18px;padding-bottom:9px;">→</div>
-        <div style="flex:1;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">$ al prestador</div>
-          <input type="number" id="mc-monto-prest" min="0" oninput="mcFromMonto()"
-            style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;">
+        <div style="color:var(--muted);font-size:13px;">→</div>
+        <div style="flex:1.5;text-align:right;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">Base efectiva</div>
+          <div id="mc-base-efectiva" style="font-size:16px;font-weight:700;color:var(--text);">$ 0</div>
         </div>
       </div>
     </div>
+
+    <!-- SECCIÓN 2: lo que se lleva el prestador (existente) -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">👤 ¿Qué se lleva el prestador?</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <div onclick="mcSetPrestador(0)"        style="flex:1;padding:7px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;text-align:center;">$ 0 — no salió</div>
+        <div onclick="mcSetPrestador('movida')" style="flex:1;padding:7px;font-size:11px;font-weight:700;border-radius:5px;border:1px solid #F59E0B;color:#F59E0B;cursor:pointer;user-select:none;text-align:center;">Solo la movida</div>
+      </div>
+      <input type="number" id="mc-monto-prest" min="0" oninput="mcUpdateAll()"
+        style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;">
+    </div>
+
+    <!-- Resultado -->
     <div style="display:flex;justify-content:space-between;font-size:13px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:18px;">
       <span style="color:var(--muted);">AVEX se lleva</span>
       <span id="mc-avex" style="font-weight:700;color:var(--blue);">$ 0</span>
@@ -2471,15 +2487,14 @@ function cancelarViaje(id) {
   _cancelViajeId = id;
   const baseReal = (v.total || 0) - (v.montoIva || 0);
   const movida   = v.montoMovida || 0;
-  const pctMovida = baseReal > 0 ? Math.round(movida / baseReal * 100) : 0;
   document.getElementById('mc-base').textContent        = fmt(baseReal);
   document.getElementById('mc-movida-orig').textContent = fmt(movida);
   const montInp = document.getElementById('mc-monto-prest');
   montInp.dataset.base   = baseReal;
   montInp.dataset.movida = movida;
   montInp.value          = movida;
-  document.getElementById('mc-pct').value = pctMovida;
-  mcUpdateAvex();
+  document.getElementById('mc-pct-desc').value = 100; // sin descuento por defecto
+  mcUpdateAll();
   document.getElementById('modalCancelacion').style.display = 'flex';
 }
 
@@ -2488,46 +2503,32 @@ function cerrarModalCancelacion() {
   _cancelViajeId = null;
 }
 
-function mcSetPct(val) {
-  const montInp = document.getElementById('mc-monto-prest');
-  const base    = parseFloat(montInp.dataset.base || 0);
-  let pct;
-  if (val === 'movida') {
-    const movida = parseFloat(montInp.dataset.movida || 0);
-    montInp.value = movida;
-    pct = base > 0 ? Math.round(movida / base * 100) : 0;
-  } else {
-    pct = val;
-    montInp.value = Math.round(base * pct / 100);
-  }
-  document.getElementById('mc-pct').value = pct;
-  mcUpdateAvex();
+// Cambia el % de descuento en la tarifa base
+function mcSetDescuento(pct) {
+  document.getElementById('mc-pct-desc').value = pct;
+  mcUpdateAll();
 }
 
-function mcFromPct() {
-  const pct     = parseFloat(document.getElementById('mc-pct').value) || 0;
+// Cambia lo que se lleva el prestador
+function mcSetPrestador(val) {
   const montInp = document.getElementById('mc-monto-prest');
-  const base    = parseFloat(montInp.dataset.base || 0);
-  montInp.value = Math.round(base * pct / 100);
-  mcUpdateAvex();
+  montInp.value = val === 'movida' ? (montInp.dataset.movida || 0) : 0;
+  mcUpdateAll();
 }
 
-function mcFromMonto() {
-  const montInp = document.getElementById('mc-monto-prest');
-  const base    = parseFloat(montInp.dataset.base || 0);
-  const mont    = parseFloat(montInp.value) || 0;
-  document.getElementById('mc-pct').value = base > 0 ? (mont / base * 100).toFixed(1) : 0;
-  mcUpdateAvex();
+// Recalcula base efectiva y AVEX cada vez que cambia algo
+function mcUpdateAll() {
+  const montInp    = document.getElementById('mc-monto-prest');
+  const base       = parseFloat(montInp.dataset.base || 0);
+  const pctDesc    = parseFloat(document.getElementById('mc-pct-desc').value);
+  const pct        = isNaN(pctDesc) ? 100 : Math.min(100, Math.max(0, pctDesc));
+  const baseEfect  = Math.round(base * pct / 100);
+  const montPrest  = parseFloat(montInp.value) || 0;
+  document.getElementById('mc-base-efectiva').textContent = fmt(baseEfect);
+  document.getElementById('mc-avex').textContent = fmt(Math.max(0, baseEfect - montPrest));
 }
 
-function mcUpdateAvex() {
-  const montInp = document.getElementById('mc-monto-prest');
-  const base    = parseFloat(montInp.dataset.base || 0);
-  const mont    = parseFloat(montInp.value) || 0;
-  document.getElementById('mc-avex').textContent = fmt(Math.max(0, base - mont));
-}
-
-function mcRecalc() { mcFromMonto(); } // compatibilidad
+function mcRecalc() { mcUpdateAll(); } // compatibilidad
 
 async function confirmarCancelacion() {
   if (!_cancelViajeId) return;
@@ -2536,12 +2537,14 @@ async function confirmarCancelacion() {
   const v         = _historialCache[idx];
   const montInp   = document.getElementById('mc-monto-prest');
   const base      = parseFloat(montInp.dataset.base || 0);
-  const montPrest = parseFloat(montInp.value) || 0;
-  const pct       = parseFloat(document.getElementById('mc-pct').value) || 0;
+  const pctDescRaw = parseFloat(document.getElementById('mc-pct-desc').value);
+  const pctDesc   = isNaN(pctDescRaw) ? 100 : Math.min(100, Math.max(0, pctDescRaw));
+  const baseEfect  = Math.round(base * pctDesc / 100);
+  const montPrest  = parseFloat(montInp.value) || 0;
   v.estado                   = 'cancelado';
-  v.montoAvexCancelado       = Math.max(0, base - montPrest);
+  v.montoAvexCancelado       = Math.max(0, baseEfect - montPrest);
   v.montoPrestadorCancelado  = montPrest;
-  v.pctCancelacion           = Math.round(pct * 10) / 10; // 1 decimal
+  v.pctCancelacion           = pctDesc < 100 ? pctDesc : null; // null = sin descuento
   if (!v.timestamps) v.timestamps = {};
   v.timestamps.cancelado = Date.now();
   cerrarModalCancelacion();
