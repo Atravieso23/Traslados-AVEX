@@ -3762,6 +3762,7 @@ function renderLiquidaciones(){
             style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);">
         </td>
         <td style="${tdStyle}color:var(--text);">${fecha}${cancBadge}</td>
+        <td style="${tdStyle}font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);">${v.cliente||'—'}</td>
         <td style="${tdStyle}font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);">${(v.origen||'').split(',')[0]} → ${(v.destino||'').split(',')[0]}</td>
         <td style="${tdStyle}font-weight:600;color:${cancelado?'var(--muted)':'var(--text)'};text-align:right;${cancelado?'text-decoration:line-through;':''}">${fmt(v.total)}</td>
         <td style="${tdStyle}color:#A78BFA;font-weight:600;text-align:right;">${iva>0?fmt(iva):'—'}</td>
@@ -3852,6 +3853,7 @@ function renderLiquidaciones(){
                   style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);">
               </th>
               <th style="${thStyle}color:var(--muted);">Fecha</th>
+              <th style="${thStyle}color:var(--muted);text-align:left;">Cliente</th>
               <th style="${thStyle}color:var(--muted);text-align:left;">Recorrido</th>
               <th style="${thStyle}color:var(--muted);text-align:right;">Total</th>
               <th style="${thStyle}color:#A78BFA;text-align:right;">IVA</th>
