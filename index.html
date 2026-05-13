@@ -2005,7 +2005,6 @@ async function suggestDir(tipo) {
   const input = document.getElementById(tipo+'Input');
   const list  = document.getElementById(tipo+'Suggestions');
   const q = input.value.trim();
-  // Clear stored coords when user types (invalidate previous selection)
   delete input.dataset.lat; delete input.dataset.lon;
   window[`_${tipo}LatLon`] = null;
   _sugIdx[tipo] = -1;
@@ -2013,31 +2012,58 @@ async function suggestDir(tipo) {
   if (q.length < 3) { list.style.display='none'; list.innerHTML=''; return; }
   clearTimeout(timers[tipo]);
   timers[tipo] = setTimeout(async () => {
+    // Mostrar spinner
+    list.innerHTML = '<div class="sug-item" style="color:var(--muted);cursor:default;">Buscando...</div>';
+    list.style.display = '';
+
+    let results = [];
+
+    // 1) Intentar Photon (sin lang=es, que no es válido)
     try {
-      // Photon geocoder — much better autocomplete for Argentina
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=-34.62&lon=-58.44&lang=es`;
-      const data = await (await fetch(url, {signal: AbortSignal.timeout(5000)})).json();
-      const items = data.features || [];
-      renderSuggestions(tipo, items.map(f => {
-        const p = f.properties;
-        const parts = [p.name, p.street && p.housenumber ? p.street+' '+p.housenumber : p.street, p.city||p.town||p.village, p.state].filter(Boolean);
-        // Avoid duplicating name if it's the same as street
-        const label = [...new Set(parts)].join(', ');
-        return { label, lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
-      }));
-    } catch(e) {
-      // Fallback: Nominatim
+      const r = await fetch(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=-34.62&lon=-58.44`,
+        {signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined}
+      );
+      if (r.ok) {
+        const data = await r.json();
+        results = (data.features || []).map(f => {
+          const p = f.properties;
+          const parts = [
+            p.housenumber && p.street ? p.street + ' ' + p.housenumber : (p.street || p.name),
+            p.city || p.town || p.village || p.county,
+            p.state
+          ].filter(Boolean);
+          const label = [...new Set(parts)].join(', ');
+          return { label: label || p.name || '', lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
+        }).filter(x => x.label);
+      }
+    } catch(e) { /* Photon falló, probar Nominatim */ }
+
+    // 2) Si Photon dio 0 resultados, usar Nominatim
+    if (!results.length) {
       try {
-        const d = await (await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+', Argentina')}&format=json&limit=6&countrycodes=ar&accept-language=es`,
-          {headers:{'User-Agent':'AVEX-App/1.0'}, signal: AbortSignal.timeout(5000)}
-        )).json();
-        renderSuggestions(tipo, d.map(item => ({
-          label: item.display_name.split(',').slice(0,4).join(', '),
-          lat: parseFloat(item.lat), lon: parseFloat(item.lon)
-        })));
-      } catch(e2) { /* silent */ }
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ', Argentina')}&format=json&limit=6&countrycodes=ar&addressdetails=1&accept-language=es`,
+          {signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined}
+        );
+        if (r.ok) {
+          const d = await r.json();
+          results = d.map(item => {
+            const a = item.address || {};
+            const parts = [
+              a.road && a.house_number ? a.road + ' ' + a.house_number : (a.road || a.amenity || a.tourism),
+              a.suburb || a.neighbourhood,
+              a.city || a.town || a.village || a.municipality,
+              a.state
+            ].filter(Boolean);
+            const label = [...new Set(parts)].join(', ') || item.display_name.split(',').slice(0,3).join(', ');
+            return { label, lat: parseFloat(item.lat), lon: parseFloat(item.lon) };
+          }).filter(x => x.label);
+        }
+      } catch(e) { /* silencioso */ }
     }
+
+    renderSuggestions(tipo, results);
   }, 350);
 }
 
