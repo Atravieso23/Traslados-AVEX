@@ -676,27 +676,52 @@ input::placeholder{color:#404040;}
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Origen</label>
-      <button onclick="abrirMapaPicker('origen')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:4px;">📍 Elegir en mapa</button>
+    <!-- Origen -->
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">🟢 Origen</label>
+        <div onclick="abrirMapaPicker('origen')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;user-select:none;">📍 Elegir en mapa</div>
+      </div>
+      <div class="field" style="position:relative;margin:0;">
+        <input type="text" id="origenInput" placeholder="Ej: Viamonte 300, Buenos Aires" autocomplete="off"
+          oninput="suggestDir('origen')" onkeydown="dirKeydown(event,'origen')"
+          style="width:100%;box-sizing:border-box;">
+        <div id="origenSuggestions" class="suggestions" style="display:none;"></div>
+      </div>
     </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:14px;">
-      <div class="field"><label>Calle</label><input type="text" id="origenCalle" placeholder="Ej: Viamonte" oninput="actualizarDireccion('origen')"></div>
-      <div class="field"><label>Altura</label><input type="text" id="origenAltura" placeholder="300" oninput="actualizarDireccion('origen')"></div>
-      <div class="field"><label>Localidad</label><input type="text" id="origenLocalidad" placeholder="CABA" oninput="actualizarDireccion('origen')"></div>
+
+    <!-- Destino -->
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">🔴 Destino</label>
+        <div onclick="abrirMapaPicker('destino')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;user-select:none;">📍 Elegir en mapa</div>
+      </div>
+      <div class="field" style="position:relative;margin:0;">
+        <input type="text" id="destinoInput" placeholder="Ej: Av. Maipú 1300, Vicente López" autocomplete="off"
+          oninput="suggestDir('destino')" onkeydown="dirKeydown(event,'destino')"
+          style="width:100%;box-sizing:border-box;">
+        <div id="destinoSuggestions" class="suggestions" style="display:none;"></div>
+      </div>
     </div>
-    <input type="hidden" id="origenInput">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Destino</label>
-      <button onclick="abrirMapaPicker('destino')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:4px;">📍 Elegir en mapa</button>
+
+    <!-- Preview ruta (aparece automáticamente cuando ambos puntos están confirmados) -->
+    <div id="routePreviewBox" style="display:none;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px;">
+      <div id="routePreviewMap" style="height:200px;width:100%;"></div>
+      <div style="padding:10px 14px;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-size:12px;color:var(--muted);flex:1;" id="routePreviewStatus">Calculando vista previa...</div>
+        <div style="font-size:14px;font-weight:700;color:var(--accent);" id="routePreviewDist">—</div>
+        <div onclick="limpiarPuntosRuta()" style="font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;user-select:none;">✕ Limpiar</div>
+      </div>
     </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:6px;">
-      <div class="field"><label>Calle</label><input type="text" id="destinoCalle" placeholder="Ej: Av. Maipú" oninput="actualizarDireccion('destino')"></div>
-      <div class="field"><label>Altura</label><input type="text" id="destinoAltura" placeholder="1300" oninput="actualizarDireccion('destino')"></div>
-      <div class="field"><label>Localidad</label><input type="text" id="destinoLocalidad" placeholder="Vicente López" oninput="actualizarDireccion('destino')"></div>
-    </div>
-    <input type="hidden" id="destinoInput">
-    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;" id="dirPreview"></div>
+
+    <!-- Hidden compat fields (no borrar - usados por mapa picker y otros) -->
+    <input type="hidden" id="origenCalle">
+    <input type="hidden" id="origenAltura">
+    <input type="hidden" id="origenLocalidad">
+    <input type="hidden" id="destinoCalle">
+    <input type="hidden" id="destinoAltura">
+    <input type="hidden" id="destinoLocalidad">
+    <div id="dirPreview" style="display:none;"></div>
 
     <!-- MODAL MAPA PICKER -->
     <div id="mapaPickerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20000;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
@@ -1321,18 +1346,11 @@ function showPage(id, tab) {
 
 // ── DIRECCIÓN ESTRUCTURADA ─────────────────────────────────────
 function actualizarDireccion(tipo) {
-  const calle    = document.getElementById(tipo+'Calle').value.trim();
-  const altura   = document.getElementById(tipo+'Altura').value.trim();
-  const localidad= document.getElementById(tipo+'Localidad').value.trim();
-  const input = document.getElementById(tipo+'Input');
-  input.value = [calle, altura, localidad].filter(Boolean).join(' ');
-  delete input.dataset.lat; delete input.dataset.lon;
-  const preview = document.getElementById('dirPreview');
-  if (preview) {
-    const o = [document.getElementById('origenCalle').value.trim(), document.getElementById('origenAltura').value.trim(), document.getElementById('origenLocalidad').value.trim()].filter(Boolean).join(' ');
-    const d = [document.getElementById('destinoCalle').value.trim(), document.getElementById('destinoAltura').value.trim(), document.getElementById('destinoLocalidad').value.trim()].filter(Boolean).join(' ');
-    preview.textContent = o && d ? '📍 '+o+' → '+d : o ? '📍 Origen: '+o : '';
-  }
+  // With new single-input UI, this is kept only for mapa picker compat
+  // The picker calls confirmarPuntoMapa which sets the input directly
+  delete document.getElementById(tipo+'Input').dataset.lat;
+  delete document.getElementById(tipo+'Input').dataset.lon;
+  window[`_${tipo}LatLon`] = null;
 }
 
 // ── PRESTADORES ───────────────────────────────────────────────
@@ -1583,24 +1601,13 @@ function parsearAsistencia(txt) {
     return { calle, altura, localidad };
   }
 
-  const origen  = parseDireccion(get('Origen'));
-  const destino = parseDireccion(get('Destino'));
-
-  if (origen) {
-    document.getElementById('origenCalle').value    = origen.calle;
-    document.getElementById('origenAltura').value   = origen.altura;
-    document.getElementById('origenLocalidad').value = origen.localidad;
-    actualizarDireccion('origen');
-  }
-  if (destino) {
-    document.getElementById('destinoCalle').value    = destino.calle;
-    document.getElementById('destinoAltura').value   = destino.altura;
-    document.getElementById('destinoLocalidad').value = destino.localidad;
-    actualizarDireccion('destino');
-  }
+  const origenRaw  = get('Origen');
+  const destinoRaw = get('Destino');
+  if (origenRaw)  document.getElementById('origenInput').value  = origenRaw;
+  if (destinoRaw) document.getElementById('destinoInput').value = destinoRaw;
 
   // Feedback
-  const campos = [asegurado, tel, vehiculo, patente, origen?.calle, destino?.calle].filter(Boolean).length;
+  const campos = [asegurado, tel, vehiculo, patente, origenRaw, destinoRaw].filter(Boolean).length;
   document.getElementById('pasteStatus').textContent = campos > 0
     ? `✓ ${campos} campos autocompletos`
     : '⚠ No se reconoció el formato. Verificá que el texto sea correcto.';
@@ -1692,16 +1699,15 @@ async function onPickerClick(e) {
 
 function confirmarPuntoMapa() {
   if (!_pickerLatLng || !_pickerTipo) return;
-  const {lat, lng, calle, altura, localidad, display} = _pickerLatLng;
+  const {lat, lng, display} = _pickerLatLng;
   const p = _pickerTipo;
-  document.getElementById(`${p}Calle`).value = calle;
-  document.getElementById(`${p}Altura`).value = altura;
-  document.getElementById(`${p}Localidad`).value = localidad;
-  document.getElementById(`${p}Input`).value = display;
-  // Guardar lat/lon para usarlos directamente en el cálculo
+  const input = document.getElementById(`${p}Input`);
+  input.value = display;
+  input.dataset.lat = lat;
+  input.dataset.lon = lng;
   window[`_${p}LatLon`] = {lat, lon: lng};
-  actualizarDireccion(p);
   cerrarMapaPicker();
+  tryAutoPreview();
 }
 
 function cerrarMapaPicker() {
@@ -1782,32 +1788,22 @@ function parsearUrlMaps(url) {
 async function poblarDesdeMaps(tipo, data) {
   // data = { text, lat, lon }
   if (!data) return;
-  let calle = '', altura = '', localidad = '';
+  const input = document.getElementById(`${tipo}Input`);
 
   if (data.lat !== null) {
     // Tenemos coordenadas → reverse geocode
     const r = await reverseGeocodeAddr(data.lat, data.lon);
-    if (r) { calle = r.calle; altura = r.altura; localidad = r.localidad; }
-    else { calle = `${data.lat}, ${data.lon}`; }
+    const display = r ? r.display : `${data.lat}, ${data.lon}`;
+    input.value = display;
+    input.dataset.lat = data.lat;
+    input.dataset.lon = data.lon;
     // Guardar coords para que calcularRuta las use directamente
     window[`_${tipo}LatLon`] = { lat: data.lat, lon: data.lon };
   } else if (data.text) {
-    // Tenemos texto → intentar dividir en calle / altura / localidad
-    // Ej: "Av. Corrientes 1234, Buenos Aires"
-    const parts = data.text.split(',').map(s => s.trim());
-    const calleAltura = parts[0] || '';
-    const locPart = parts.slice(1).join(', ');
-    // Separar altura del nombre de la calle
-    const altMatch = calleAltura.match(/^(.*?)\s+(\d+)\s*$/);
-    if (altMatch) { calle = altMatch[1]; altura = altMatch[2]; }
-    else { calle = calleAltura; }
-    localidad = locPart.replace(/,?\s*(Argentina|AR)$/i, '').trim();
+    input.value = data.text;
   }
 
-  document.getElementById(`${tipo}Calle`).value    = calle;
-  document.getElementById(`${tipo}Altura`).value   = altura;
-  document.getElementById(`${tipo}Localidad`).value= localidad;
-  actualizarDireccion(tipo);
+  tryAutoPreview();
 }
 
 async function procesarLinkMaps() {
@@ -1908,10 +1904,15 @@ function setPrecioPersonalizado(val) {
 
 function limpiarCalculadora() {
   // Campos de texto
-  ['origenCalle','origenAltura','origenLocalidad','destinoCalle','destinoAltura','destinoLocalidad',
-   'origenInput','destinoInput','clienteInput','telefonoInput','vehiculoInput','patenteInput',
+  ['origenInput','destinoInput','clienteInput','telefonoInput','vehiculoInput','patenteInput',
    'prestadorTelInput','prestadorNombreInput','prestadorVehiculoInput','prestadorPatenteInput',
    'pasteInput'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  // Clear stored coords
+  window._origenLatLon = null; window._destinoLatLon = null;
+  document.getElementById('routePreviewBox').style.display = 'none';
+  if (_previewRouteLayer && _previewMap) { _previewMap.removeLayer(_previewRouteLayer); _previewRouteLayer=null; }
+  if (_previewMkA && _previewMap) { _previewMap.removeLayer(_previewMkA); _previewMkA=null; }
+  if (_previewMkB && _previewMap) { _previewMap.removeLayer(_previewMkB); _previewMkB=null; }
 
   // Select prestador
   const sel = document.getElementById('prestadorSelect');
@@ -1935,10 +1936,6 @@ function limpiarCalculadora() {
   // Bloque de pegar
   const pi = document.getElementById('pasteStatus');
   if(pi) pi.textContent = '';
-
-  // Limpiar coords del picker
-  window._origenLatLon = null;
-  window._destinoLatLon = null;
 
   // Resetear tipo de servicio a Particular
   switchCalcTipo('particular');
@@ -2002,29 +1999,181 @@ const mkPin = (l,name) => L.divIcon({className:'',
 
 // ── AUTOCOMPLETE ──────────────────────────────────────────────
 let timers={};
-async function suggest(input,listId){
-  const q=input.value.trim(),list=document.getElementById(listId);
-  if(q.length<3){list.innerHTML='';return;}
-  clearTimeout(timers[listId]);
-  timers[listId]=setTimeout(async()=>{
-    try{
-      const d=await(await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' Argentina')}&format=json&limit=6&addressdetails=1&accept-language=es`,{headers:{'User-Agent':'AVEX-App/1.0'}})).json();
-      list.innerHTML='';
-      if(!d.length){list.innerHTML='<div class="sug-item" style="color:var(--muted)">Sin resultados</div>';return;}
-      d.forEach(item=>{
-        const div=document.createElement('div');
-        div.className='sug-item';
-        div.textContent=item.display_name.split(',').slice(0,4).join(', ');
-        div.onclick=()=>{input.value=div.textContent;input.dataset.lat=item.lat;input.dataset.lon=item.lon;list.innerHTML='';};
-        list.appendChild(div);
-      });
-    }catch(e){
-      // Fallback: permitir ingreso manual sin sugerencias
-      list.innerHTML='';
+let _sugIdx = { origen: -1, destino: -1 }; // selected suggestion index for keyboard nav
+
+async function suggestDir(tipo) {
+  const input = document.getElementById(tipo+'Input');
+  const list  = document.getElementById(tipo+'Suggestions');
+  const q = input.value.trim();
+  // Clear stored coords when user types (invalidate previous selection)
+  delete input.dataset.lat; delete input.dataset.lon;
+  window[`_${tipo}LatLon`] = null;
+  _sugIdx[tipo] = -1;
+
+  if (q.length < 3) { list.style.display='none'; list.innerHTML=''; return; }
+  clearTimeout(timers[tipo]);
+  timers[tipo] = setTimeout(async () => {
+    try {
+      // Photon geocoder — much better autocomplete for Argentina
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=-34.62&lon=-58.44&lang=es`;
+      const data = await (await fetch(url, {signal: AbortSignal.timeout(5000)})).json();
+      const items = data.features || [];
+      renderSuggestions(tipo, items.map(f => {
+        const p = f.properties;
+        const parts = [p.name, p.street && p.housenumber ? p.street+' '+p.housenumber : p.street, p.city||p.town||p.village, p.state].filter(Boolean);
+        // Avoid duplicating name if it's the same as street
+        const label = [...new Set(parts)].join(', ');
+        return { label, lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
+      }));
+    } catch(e) {
+      // Fallback: Nominatim
+      try {
+        const d = await (await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+', Argentina')}&format=json&limit=6&countrycodes=ar&accept-language=es`,
+          {headers:{'User-Agent':'AVEX-App/1.0'}, signal: AbortSignal.timeout(5000)}
+        )).json();
+        renderSuggestions(tipo, d.map(item => ({
+          label: item.display_name.split(',').slice(0,4).join(', '),
+          lat: parseFloat(item.lat), lon: parseFloat(item.lon)
+        })));
+      } catch(e2) { /* silent */ }
     }
-  },400);
+  }, 350);
 }
-document.addEventListener('click',e=>{if(!e.target.closest('.field'))document.querySelectorAll('.suggestions').forEach(s=>s.innerHTML='');});
+
+function renderSuggestions(tipo, items) {
+  const list = document.getElementById(tipo+'Suggestions');
+  list.innerHTML = '';
+  if (!items.length) {
+    list.innerHTML = '<div class="sug-item" style="color:var(--muted);cursor:default;">Sin resultados — probá con otra dirección</div>';
+    list.style.display = '';
+    return;
+  }
+  items.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'sug-item';
+    div.textContent = item.label;
+    div.onclick = () => seleccionarSuggestion(tipo, item);
+    list.appendChild(div);
+  });
+  list.style.display = '';
+}
+
+function seleccionarSuggestion(tipo, item) {
+  const input = document.getElementById(tipo+'Input');
+  const list  = document.getElementById(tipo+'Suggestions');
+  input.value = item.label;
+  input.dataset.lat = item.lat;
+  input.dataset.lon = item.lon;
+  window[`_${tipo}LatLon`] = { lat: item.lat, lon: item.lon };
+  list.style.display = 'none'; list.innerHTML = '';
+  _sugIdx[tipo] = -1;
+  tryAutoPreview();
+}
+
+function dirKeydown(e, tipo) {
+  const list = document.getElementById(tipo+'Suggestions');
+  const items = list.querySelectorAll('.sug-item[onclick]');
+  if (!items.length) {
+    if (e.key === 'Enter') { tryAutoPreview(); calcularRuta(); }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _sugIdx[tipo] = Math.min(_sugIdx[tipo]+1, items.length-1);
+    items.forEach((el,i)=>el.style.background=i===_sugIdx[tipo]?'var(--surface2)':'');
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _sugIdx[tipo] = Math.max(_sugIdx[tipo]-1, -1);
+    items.forEach((el,i)=>el.style.background=i===_sugIdx[tipo]?'var(--surface2)':'');
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (_sugIdx[tipo] >= 0 && items[_sugIdx[tipo]]) {
+      items[_sugIdx[tipo]].click();
+    } else {
+      list.style.display='none'; tryAutoPreview(); calcularRuta();
+    }
+  } else if (e.key === 'Escape') {
+    list.style.display='none';
+  }
+}
+
+// Cierra sugerencias al hacer click fuera
+document.addEventListener('click', e => {
+  if (!e.target.closest('.field')) {
+    document.querySelectorAll('.suggestions').forEach(s => { s.style.display='none'; s.innerHTML=''; });
+  }
+});
+
+// ── VISTA PREVIA DE RUTA ──────────────────────────────────────
+let _previewMap = null, _previewRouteLayer = null, _previewMkA = null, _previewMkB = null;
+
+function limpiarPuntosRuta() {
+  ['origen','destino'].forEach(t => {
+    const inp = document.getElementById(t+'Input');
+    inp.value = ''; delete inp.dataset.lat; delete inp.dataset.lon;
+    window[`_${t}LatLon`] = null;
+  });
+  document.getElementById('routePreviewBox').style.display = 'none';
+}
+
+async function tryAutoPreview() {
+  const oLat = window._origenLatLon?.lat || parseFloat(document.getElementById('origenInput').dataset.lat);
+  const oLon = window._origenLatLon?.lon || parseFloat(document.getElementById('origenInput').dataset.lon);
+  const dLat = window._destinoLatLon?.lat || parseFloat(document.getElementById('destinoInput').dataset.lat);
+  const dLon = window._destinoLatLon?.lon || parseFloat(document.getElementById('destinoInput').dataset.lon);
+  if (!oLat || !dLat || isNaN(oLat) || isNaN(dLat)) return;
+
+  const box = document.getElementById('routePreviewBox');
+  const statusEl = document.getElementById('routePreviewStatus');
+  const distEl   = document.getElementById('routePreviewDist');
+  box.style.display = '';
+  statusEl.textContent = 'Calculando ruta...';
+  distEl.textContent = '—';
+
+  // Init preview map
+  if (!_previewMap) {
+    _previewMap = L.map('routePreviewMap', {zoomControl:false, attributionControl:false}).setView([-34.62,-58.44], 11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {maxZoom:19}).addTo(_previewMap);
+  }
+  // Clear old markers/route
+  if (_previewRouteLayer) { _previewMap.removeLayer(_previewRouteLayer); _previewRouteLayer=null; }
+  if (_previewMkA) { _previewMap.removeLayer(_previewMkA); _previewMkA=null; }
+  if (_previewMkB) { _previewMap.removeLayer(_previewMkB); _previewMkB=null; }
+
+  const mkIcon = (color, letter) => L.divIcon({className:'',
+    html:`<div style="background:${color};color:#000;font-family:Inter,sans-serif;font-size:11px;font-weight:700;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.5);">${letter}</div>`,
+    iconAnchor:[11,11]});
+
+  _previewMkA = L.marker([oLat,oLon], {icon:mkIcon('#22C55E','A')}).addTo(_previewMap);
+  _previewMkB = L.marker([dLat,dLon], {icon:mkIcon('#EF4444','B')}).addTo(_previewMap);
+
+  try {
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${oLon},${oLat};${dLon},${dLat}?overview=full&geometries=geojson`;
+    const rd = await (await fetch(osrmUrl, {signal:AbortSignal.timeout(6000)})).json();
+    if (rd.routes?.[0]) {
+      const route = rd.routes[0];
+      const km = (route.distance / 1000).toFixed(1);
+      const mins = Math.round(route.duration / 60);
+      _previewRouteLayer = L.geoJSON(route.geometry, {style:{color:'#22C55E',weight:4,opacity:0.8}}).addTo(_previewMap);
+      const bounds = _previewRouteLayer.getBounds().pad(0.15);
+      _previewMap.fitBounds(bounds);
+      statusEl.textContent = `${mins} min · ruta confirmada`;
+      distEl.textContent = `${km} km`;
+    } else {
+      _previewMap.fitBounds([[oLat,oLon],[dLat,dLon]]);
+      statusEl.textContent = 'Sin ruta — se usará distancia directa';
+    }
+  } catch(e) {
+    _previewMap.fitBounds([[oLat,oLon],[dLat,dLon]]);
+    statusEl.textContent = 'Sin conexión para ruta — se estimará distancia';
+  }
+  // Invalidate map size after display
+  setTimeout(()=>_previewMap.invalidateSize(),50);
+}
+
+// Legacy compat for old suggest() calls (mapa picker internal)
+async function suggest(input,listId){ /* deprecated, use suggestDir */ }
 
 async function geocode(q){
   // Intentar varios endpoints hasta que uno funcione
@@ -2044,13 +2193,11 @@ async function geocode(q){
 
 // ── CALCULAR ──────────────────────────────────────────────────
 async function calcularRuta(){
-  actualizarDireccion('origen');
-  actualizarDireccion('destino');
   const oIn=document.getElementById('origenInput');
   const dIn=document.getElementById('destinoInput');
   const btn=document.getElementById('btnCalc');
   const status=document.getElementById('status');
-  if(!oIn.value.trim()||!dIn.value.trim()){alert('Completá calle, altura y localidad para origen y destino.');return;}
+  if(!oIn.value.trim()||!dIn.value.trim()){alert('Ingresá origen y destino para calcular.');return;}
   btn.disabled=true;btn.textContent='Calculando...';
   status.textContent='🔍 Buscando ubicaciones...';status.classList.add('visible');
   try{
@@ -2121,7 +2268,6 @@ async function calcularRuta(){
     btn.disabled=false;btn.textContent='Calcular tarifa y revenue →';
   }
 }
-document.getElementById('destinoLocalidad').addEventListener('keydown',e=>{if(e.key==='Enter')calcularRuta();});
 
 // ── VIAJES ACTIVOS (Supabase) ─────────────────────────────────
 let _viajesActivosCache = {};
