@@ -2012,55 +2012,33 @@ async function suggestDir(tipo) {
   if (q.length < 3) { list.style.display='none'; list.innerHTML=''; return; }
   clearTimeout(timers[tipo]);
   timers[tipo] = setTimeout(async () => {
-    // Mostrar spinner
     list.innerHTML = '<div class="sug-item" style="color:var(--muted);cursor:default;">Buscando...</div>';
     list.style.display = '';
 
     let results = [];
 
-    // 1) Intentar Photon (sin lang=es, que no es válido)
+    // Nominatim — Argentina only, con addressdetails para obtener altura
     try {
       const r = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=-34.62&lon=-58.44`,
-        {signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined}
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=7&countrycodes=ar&addressdetails=1&accept-language=es`,
+        {signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined}
       );
       if (r.ok) {
-        const data = await r.json();
-        results = (data.features || []).map(f => {
-          const p = f.properties;
-          const parts = [
-            p.housenumber && p.street ? p.street + ' ' + p.housenumber : (p.street || p.name),
-            p.city || p.town || p.village || p.county,
-            p.state
-          ].filter(Boolean);
-          const label = [...new Set(parts)].join(', ');
-          return { label: label || p.name || '', lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
+        const d = await r.json();
+        results = d.map(item => {
+          const a = item.address || {};
+          // Altura: usar house_number si existe
+          const calle = a.road || a.pedestrian || a.footway || a.amenity || a.building || a.tourism;
+          const altura = a.house_number;
+          const calleConAltura = calle && altura ? `${calle} ${altura}` : (calle || '');
+          const barrio = a.suburb || a.neighbourhood || a.quarter;
+          const ciudad = a.city || a.town || a.village || a.municipality;
+          const parts = [calleConAltura, barrio, ciudad].filter(Boolean);
+          const label = [...new Set(parts)].join(', ') || item.display_name.split(',').slice(0,3).join(', ');
+          return { label, lat: parseFloat(item.lat), lon: parseFloat(item.lon) };
         }).filter(x => x.label);
       }
-    } catch(e) { /* Photon falló, probar Nominatim */ }
-
-    // 2) Si Photon dio 0 resultados, usar Nominatim
-    if (!results.length) {
-      try {
-        const r = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ', Argentina')}&format=json&limit=6&countrycodes=ar&addressdetails=1&accept-language=es`,
-          {signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined}
-        );
-        if (r.ok) {
-          const d = await r.json();
-          results = d.map(item => {
-            const a = item.address || {};
-            const parts = [
-              a.road && a.house_number ? a.road + ' ' + a.house_number : (a.road || a.amenity || a.tourism),
-              a.suburb || a.neighbourhood,
-              a.city || a.town || a.village || a.municipality,
-              a.state
-            ].filter(Boolean);
-            const label = [...new Set(parts)].join(', ') || item.display_name.split(',').slice(0,3).join(', ');
-            return { label, lat: parseFloat(item.lat), lon: parseFloat(item.lon) };
-          }).filter(x => x.label);
-        }
-      } catch(e) { /* silencioso */ }
+    } catch(e) { /* silencioso */ }
     }
 
     renderSuggestions(tipo, results);
@@ -2160,7 +2138,7 @@ async function tryAutoPreview() {
   // Init preview map
   if (!_previewMap) {
     _previewMap = L.map('routePreviewMap', {zoomControl:false, attributionControl:false}).setView([-34.62,-58.44], 11);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {maxZoom:19}).addTo(_previewMap);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19}).addTo(_previewMap);
   }
   // Clear old markers/route
   if (_previewRouteLayer) { _previewMap.removeLayer(_previewRouteLayer); _previewRouteLayer=null; }
