@@ -2039,7 +2039,6 @@ async function suggestDir(tipo) {
         }).filter(x => x.label);
       }
     } catch(e) { /* silencioso */ }
-    }
 
     renderSuggestions(tipo, results);
   }, 350);
