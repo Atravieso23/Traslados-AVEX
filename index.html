@@ -2025,18 +2025,25 @@ async function suggestDir(tipo) {
       );
       if (r.ok) {
         const d = await r.json();
+        const seen = new Set();
         results = d.map(item => {
           const a = item.address || {};
-          // Altura: usar house_number si existe
-          const calle = a.road || a.pedestrian || a.footway || a.amenity || a.building || a.tourism;
-          const altura = a.house_number;
-          const calleConAltura = calle && altura ? `${calle} ${altura}` : (calle || '');
-          const barrio = a.suburb || a.neighbourhood || a.quarter;
-          const ciudad = a.city || a.town || a.village || a.municipality;
-          const parts = [calleConAltura, barrio, ciudad].filter(Boolean);
-          const label = [...new Set(parts)].join(', ') || item.display_name.split(',').slice(0,3).join(', ');
+          const calle   = a.road || a.pedestrian || a.footway || a.amenity || a.building || a.tourism || a.leisure;
+          const altura  = a.house_number;
+          const calleH  = calle && altura ? `${calle} ${altura}` : (calle || '');
+          const barrio  = a.city_district || a.suburb || a.neighbourhood || a.quarter;
+          const ciudad  = a.city || a.town || a.village || a.municipality;
+          const provincia = a.state;
+          // Siempre incluir al menos ciudad o provincia para distinguir resultados
+          const parts = [calleH, barrio, ciudad, provincia].filter(Boolean);
+          const label = [...new Set(parts)].join(', ') || item.display_name.split(',').slice(0,4).join(', ').trim();
           return { label, lat: parseFloat(item.lat), lon: parseFloat(item.lon) };
-        }).filter(x => x.label);
+        }).filter(x => {
+          if (!x.label) return false;
+          if (seen.has(x.label)) return false; // eliminar duplicados
+          seen.add(x.label);
+          return true;
+        });
       }
     } catch(e) { /* silencioso */ }
 
