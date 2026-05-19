@@ -2015,12 +2015,18 @@ async function suggestDir(tipo) {
     list.innerHTML = '<div class="sug-item" style="color:var(--muted);cursor:default;">Buscando...</div>';
     list.style.display = '';
 
-    let results = [];
+    // Detectar cruce: "Av Santa Fe y Callao" → "Av Santa Fe & Callao"
+    const esCruce = /\by\b/i.test(q) || q.includes('&');
+    const qNorm   = q.replace(/\s+y\s+/gi, ' & ');
 
-    // Nominatim — Argentina only, con addressdetails para obtener altura
+    // Detectar posible altura numérica en la búsqueda (ej: "Herrera 1654")
+    const alturaMatch = q.match(/\b(\d{3,5})\b/);
+    const alturaQuery = alturaMatch ? alturaMatch[1] : null;
+
+    let results = [];
     try {
       const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=7&countrycodes=ar&addressdetails=1&accept-language=es`,
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(qNorm + ', Argentina')}&format=json&limit=8&countrycodes=ar&addressdetails=1&accept-language=es`,
         {signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined}
       );
       if (r.ok) {
@@ -2028,19 +2034,30 @@ async function suggestDir(tipo) {
         const seen = new Set();
         results = d.map(item => {
           const a = item.address || {};
-          const calle   = a.road || a.pedestrian || a.footway || a.amenity || a.building || a.tourism || a.leisure;
-          const altura  = a.house_number;
-          const calleH  = calle && altura ? `${calle} ${altura}` : (calle || '');
-          const barrio  = a.city_district || a.suburb || a.neighbourhood || a.quarter;
-          const ciudad  = a.city || a.town || a.village || a.municipality;
-          const provincia = a.state;
-          // Siempre incluir al menos ciudad o provincia para distinguir resultados
-          const parts = [calleH, barrio, ciudad, provincia].filter(Boolean);
-          const label = [...new Set(parts)].join(', ') || item.display_name.split(',').slice(0,4).join(', ').trim();
+          const calle = a.road || a.pedestrian || a.footway || a.amenity || a.building || a.tourism || a.leisure;
+
+          // Altura: la de Nominatim tiene prioridad; si no existe, usar la del query
+          const altura = a.house_number || (!esCruce && alturaQuery ? alturaQuery : null);
+          const calleH = calle && altura ? `${calle} ${altura}` : (calle || '');
+
+          // Para cruces: mostrar las dos calles desde display_name
+          let labelBase;
+          if (esCruce && !calle) {
+            // Nominatim devuelve nodo de cruce; usar display_name limpio
+            labelBase = item.display_name.split(',').slice(0, 3).join(', ').trim();
+          } else {
+            const barrio   = a.city_district || a.suburb || a.neighbourhood || a.quarter;
+            const ciudad   = a.city || a.town || a.village || a.municipality;
+            const provincia = a.state;
+            const parts = [calleH, barrio, ciudad, provincia].filter(Boolean);
+            labelBase = [...new Set(parts)].join(', ') || item.display_name.split(',').slice(0, 4).join(', ').trim();
+          }
+
+          const label = labelBase;
           return { label, lat: parseFloat(item.lat), lon: parseFloat(item.lon) };
         }).filter(x => {
           if (!x.label) return false;
-          if (seen.has(x.label)) return false; // eliminar duplicados
+          if (seen.has(x.label)) return false;
           seen.add(x.label);
           return true;
         });
