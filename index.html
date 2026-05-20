@@ -4484,16 +4484,28 @@ function pRender() {
     </div>`;
   }).join('');
 
-  // Navegación
-  const navOrigen = (v.estado === 'pendiente' || v.estado === 'en-camino') ? `
-    <div class="p-card" style="padding:14px 16px;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">🧭 Navegar al origen</div>
-      <div style="font-size:12px;color:var(--text);margin-bottom:12px;">${v.origen}</div>
+  // Navegación — desde ubicación actual del prestador
+  const mkNavCard = (titulo, direccion, lat, lon, dirText) => {
+    const hasCoords = lat && lon && !isNaN(lat) && !isNaN(lon);
+    const gmUrl  = hasCoords
+      ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`
+      : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dirText + ', Argentina')}&travelmode=driving`;
+    const wazUrl = hasCoords
+      ? `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`
+      : `https://waze.com/ul?q=${encodeURIComponent(dirText)}&navigate=yes`;
+    return `<div class="p-card" style="padding:14px 16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">${titulo}</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:12px;line-height:1.4;">${direccion}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button onclick="window.open('https://www.google.com/maps/dir/?api=1&origin=${v.oLat},${v.oLon}&destination=${v.dLat},${v.dLon}&travelmode=driving')" style="padding:10px;border:none;border-radius:6px;background:#4285F4;color:#fff;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Google Maps</button>
-        <button onclick="window.open('https://waze.com/ul?from_lat=${v.oLat}&from_lon=${v.oLon}&ll=${v.dLat},${v.dLon}&navigate=yes')" style="padding:10px;border:none;border-radius:6px;background:#33CCFF;color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Waze</button>
+        <a href="${gmUrl}" target="_blank" style="padding:11px;border-radius:6px;background:#4285F4;color:#fff;font-family:Inter,sans-serif;font-size:13px;font-weight:700;text-decoration:none;text-align:center;display:block;">🗺 Google Maps</a>
+        <a href="${wazUrl}" target="_blank" style="padding:11px;border-radius:6px;background:#33CCFF;color:#000;font-family:Inter,sans-serif;font-size:13px;font-weight:700;text-decoration:none;text-align:center;display:block;">🚗 Waze</a>
       </div>
-    </div>` : '';
+    </div>`;
+  };
+  const navOrigen  = (v.estado === 'pendiente' || v.estado === 'en-camino')
+    ? mkNavCard('🧭 Ir al origen', v.origen || '—', v.oLat, v.oLon, v.origen) : '';
+  const navDestino = (v.estado === 'en-origen')
+    ? mkNavCard('🏁 Ir al destino', v.destino || '—', v.dLat, v.dLon, v.destino) : '';
 
   // Fotos — solo cuando está en origen o después
   const mostrarFotos = ['en-origen','en-destino','cobro','completado'].includes(v.estado);
@@ -4606,6 +4618,7 @@ function pRender() {
       <div class="p-row"><span class="p-row-icon">🚘</span><div><div class="p-row-label">Vehículo</div><div class="p-row-value">${v.vehiculoCliente||'—'} · ${v.patenteCliente||'—'}</div></div></div>
     </div>
     ${navOrigen}
+    ${navDestino}
     <div class="p-card" style="overflow:hidden;"><div id="p-map" style="height:200px;"></div></div>
     <div class="p-total">
       <div><div class="p-total-label">Total del servicio</div><div><span class="p-total-price">${fmt(v.total)}</span><span class="p-total-cur">ARS</span></div></div>
