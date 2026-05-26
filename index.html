@@ -2140,8 +2140,15 @@ function limpiarPuntosRuta() {
     const inp = document.getElementById(t+'Input');
     inp.value = ''; delete inp.dataset.lat; delete inp.dataset.lon;
     window[`_${t}LatLon`] = null;
+    // Cerrar sugerencias
+    const list = document.getElementById(t+'Suggestions');
+    if (list) { list.style.display='none'; list.innerHTML=''; }
   });
   document.getElementById('routePreviewBox').style.display = 'none';
+  // Limpiar layers del mapa
+  if (_previewRouteLayer && _previewMap) { _previewMap.removeLayer(_previewRouteLayer); _previewRouteLayer = null; }
+  if (_previewMkA && _previewMap) { _previewMap.removeLayer(_previewMkA); _previewMkA = null; }
+  if (_previewMkB && _previewMap) { _previewMap.removeLayer(_previewMkB); _previewMkB = null; }
 }
 
 async function tryAutoPreview() {
