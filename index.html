@@ -678,13 +678,9 @@ input::placeholder{color:#404040;}
 
     <!-- Origen -->
     <div style="margin-bottom:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">🟢 Origen</label>
-        <div onclick="abrirMapaPicker('origen')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;user-select:none;">📍 Elegir en mapa</div>
-      </div>
-      <div class="field" style="position:relative;margin:0;">
-        <input type="text" id="origenInput" placeholder="Ej: Viamonte 300, Buenos Aires" autocomplete="off"
-          oninput="suggestDir('origen')" onkeydown="dirKeydown(event,'origen')"
+      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">🟢 Origen</label>
+      <div class="field" style="margin:0;">
+        <input type="text" id="origenInput" placeholder="Ej: Herrera 1654, Parque Patricios" autocomplete="off"
           style="width:100%;box-sizing:border-box;">
         <div id="origenSuggestions" class="suggestions" style="display:none;"></div>
       </div>
@@ -692,19 +688,26 @@ input::placeholder{color:#404040;}
 
     <!-- Destino -->
     <div style="margin-bottom:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">🔴 Destino</label>
-        <div onclick="abrirMapaPicker('destino')" style="font-size:11px;font-weight:600;background:none;border:1px solid var(--border);color:var(--muted);padding:3px 10px;border-radius:20px;cursor:pointer;user-select:none;">📍 Elegir en mapa</div>
-      </div>
-      <div class="field" style="position:relative;margin:0;">
-        <input type="text" id="destinoInput" placeholder="Ej: Av. Maipú 1300, Vicente López" autocomplete="off"
-          oninput="suggestDir('destino')" onkeydown="dirKeydown(event,'destino')"
+      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">🔴 Destino</label>
+      <div class="field" style="margin:0;">
+        <input type="text" id="destinoInput" placeholder="Ej: Hospital Alemán, Recoleta" autocomplete="off"
           style="width:100%;box-sizing:border-box;">
         <div id="destinoSuggestions" class="suggestions" style="display:none;"></div>
       </div>
     </div>
 
-    <!-- Preview ruta (aparece automáticamente cuando ambos puntos están confirmados) -->
+    <!-- Link Google Maps inline -->
+    <div style="margin-bottom:10px;">
+      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">🗺 Link Google Maps <span style="font-weight:400;opacity:.6;">(para calcular km y ruta)</span></label>
+      <div class="field" style="margin:0;">
+        <input type="text" id="mapsLinkInline" placeholder="Pegá el link de 'Cómo llegar' de Google Maps..." autocomplete="off"
+          oninput="procesarLinkInline(this.value)"
+          style="width:100%;box-sizing:border-box;">
+      </div>
+      <div id="mapsLinkInlineStatus" style="font-size:11px;margin-top:5px;min-height:16px;"></div>
+    </div>
+
+    <!-- Preview ruta -->
     <div id="routePreviewBox" style="display:none;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px;">
       <div id="routePreviewMap" style="height:200px;width:100%;"></div>
       <div style="padding:10px 14px;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -1906,7 +1909,8 @@ function limpiarCalculadora() {
   // Campos de texto
   ['origenInput','destinoInput','clienteInput','telefonoInput','vehiculoInput','patenteInput',
    'prestadorTelInput','prestadorNombreInput','prestadorVehiculoInput','prestadorPatenteInput',
-   'pasteInput'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+   'pasteInput','mapsLinkInline'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  const mst = document.getElementById('mapsLinkInlineStatus'); if(mst) mst.textContent='';
   // Clear stored coords
   window._origenLatLon = null; window._destinoLatLon = null;
   document.getElementById('routePreviewBox').style.display = 'none';
@@ -2140,15 +2144,58 @@ function limpiarPuntosRuta() {
     const inp = document.getElementById(t+'Input');
     inp.value = ''; delete inp.dataset.lat; delete inp.dataset.lon;
     window[`_${t}LatLon`] = null;
-    // Cerrar sugerencias
-    const list = document.getElementById(t+'Suggestions');
-    if (list) { list.style.display='none'; list.innerHTML=''; }
   });
+  const linkInp = document.getElementById('mapsLinkInline');
+  if (linkInp) linkInp.value = '';
+  const st = document.getElementById('mapsLinkInlineStatus');
+  if (st) st.textContent = '';
   document.getElementById('routePreviewBox').style.display = 'none';
-  // Limpiar layers del mapa
   if (_previewRouteLayer && _previewMap) { _previewMap.removeLayer(_previewRouteLayer); _previewRouteLayer = null; }
   if (_previewMkA && _previewMap) { _previewMap.removeLayer(_previewMkA); _previewMkA = null; }
   if (_previewMkB && _previewMap) { _previewMap.removeLayer(_previewMkB); _previewMkB = null; }
+}
+
+let _mapsInlineTimer = null;
+async function procesarLinkInline(val) {
+  const url = val.trim();
+  const st = document.getElementById('mapsLinkInlineStatus');
+  if (!url) {
+    window._origenLatLon = null; window._destinoLatLon = null;
+    document.getElementById('routePreviewBox').style.display = 'none';
+    if (_previewRouteLayer && _previewMap) { _previewMap.removeLayer(_previewRouteLayer); _previewRouteLayer = null; }
+    if (_previewMkA && _previewMap) { _previewMap.removeLayer(_previewMkA); _previewMkA = null; }
+    if (_previewMkB && _previewMap) { _previewMap.removeLayer(_previewMkB); _previewMkB = null; }
+    if (st) st.textContent = '';
+    return;
+  }
+  // Solo procesar si parece un link de Maps
+  if (!url.includes('google.com/maps') && !url.includes('maps.google') && !url.includes('goo.gl/maps') && !url.includes('maps.app.goo.gl')) return;
+  if (url.includes('maps.app.goo.gl') || url.includes('goo.gl/maps')) {
+    if (st) { st.style.color='#F59E0B'; st.textContent='⚠ Link corto — en Maps tocá ⋮ → Compartir → Copiar link (el largo)'; }
+    return;
+  }
+  if (st) { st.style.color='var(--muted)'; st.textContent='🔍 Procesando...'; }
+  clearTimeout(_mapsInlineTimer);
+  _mapsInlineTimer = setTimeout(async () => {
+    const parsed = parsearUrlMaps(url);
+    if (!parsed || (!parsed.origen && !parsed.destino)) {
+      if (st) { st.style.color='#EF4444'; st.textContent='⚠ No se pudo leer la ruta. Compartí "Cómo llegar", no solo un lugar.'; }
+      return;
+    }
+    // Asignar coords directas si las hay, sino geocodificar texto
+    const resolver = async (data, tipo) => {
+      if (!data) return;
+      if (data.lat !== null) {
+        window[`_${tipo}LatLon`] = { lat: data.lat, lon: data.lon };
+      } else if (data.text) {
+        const g = await geocodeAddr(data.text + ', Argentina');
+        if (g) window[`_${tipo}LatLon`] = { lat: g.lat, lon: g.lon };
+      }
+    };
+    await Promise.all([resolver(parsed.origen,'origen'), resolver(parsed.destino,'destino')]);
+    if (st) { st.style.color='var(--accent)'; st.textContent='✓ Ruta detectada — calculando distancia...'; }
+    tryAutoPreview();
+  }, 400);
 }
 
 async function tryAutoPreview() {
