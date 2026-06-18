@@ -2188,12 +2188,14 @@ async function procesarLinkInline(val) {
       if (data.lat !== null) {
         window[`_${tipo}LatLon`] = { lat: data.lat, lon: data.lon };
       } else if (data.text) {
-        const g = await geocodeAddr(data.text + ', Argentina');
+        const g = await geocode(data.text);
         if (g) window[`_${tipo}LatLon`] = { lat: g.lat, lon: g.lon };
       }
     };
-    await Promise.all([resolver(parsed.origen,'origen'), resolver(parsed.destino,'destino')]);
-    if (st) { st.style.color='var(--accent)'; st.textContent='✓ Ruta detectada — calculando distancia...'; }
+    const timeout = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 8000));
+    await Promise.race([Promise.all([resolver(parsed.origen,'origen'), resolver(parsed.destino,'destino')]), timeout])
+      .catch(() => { if (st) { st.style.color='#EF4444'; st.textContent='⚠ No se pudo geocodificar la dirección. Probá con otro link.'; } return; });
+    if (st && st.style.color !== 'rgb(239, 68, 68)') { st.style.color='var(--accent)'; st.textContent='✓ Ruta detectada — calculando distancia...'; }
     tryAutoPreview();
   }, 400);
 }
