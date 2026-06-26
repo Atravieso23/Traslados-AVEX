@@ -1754,20 +1754,33 @@ function parsearUrlMaps(url) {
     const u = new URL(url);
     const coordRe = /^(-?\d+\.?\d*),(-?\d+\.?\d*)$/;
 
+    // Extraer coords precisas del segmento data= (formato Google Maps: !2m2!1d{lon}!2d{lat})
+    const fullPath = decodeURIComponent(u.pathname + u.search);
+    const coordsFromData = [];
+    const dataRe = /!2m2!1d(-?\d+\.?\d+)!2d(-?\d+\.?\d+)/g;
+    let dm;
+    while ((dm = dataRe.exec(fullPath)) !== null) {
+      const lon = parseFloat(dm[1]), lat = parseFloat(dm[2]);
+      // Filtrar solo coordenadas plausibles para Argentina (lat -22 a -55, lon -53 a -74)
+      if (lat > -55 && lat < -22 && lon > -74 && lon < -53) coordsFromData.push({ lat, lon });
+    }
+
     // Formato 1: /maps/dir/Origen/Destino/
     const dirMatch = u.pathname.match(/\/maps\/dir\/(.+)/);
     if (dirMatch) {
       const partes = dirMatch[1].split('/')
         .map(p => decodeURIComponent(p.replace(/\+/g, ' ')).trim())
-        .filter(p => p && !p.startsWith('@') && p !== 'data');
+        .filter(p => p && !p.startsWith('@') && !p.startsWith('data=') && p !== 'data');
 
       if (partes.length >= 2) {
-        const parse = p => {
+        const parse = (p, i) => {
           const m = p.match(coordRe);
           if (m) return { text: null, lat: parseFloat(m[1]), lon: parseFloat(m[2]) };
+          // Usar coords precisas del data= si están disponibles
+          if (coordsFromData[i]) return { text: p, lat: coordsFromData[i].lat, lon: coordsFromData[i].lon };
           return { text: p, lat: null, lon: null };
         };
-        return { origen: parse(partes[0]), destino: parse(partes[1]) };
+        return { origen: parse(partes[0], 0), destino: parse(partes[1], 1) };
       }
     }
 
@@ -1782,6 +1795,19 @@ function parsearUrlMaps(url) {
         return { text: p, lat: null, lon: null };
       };
       return { origen: parse(saddr), destino: parse(daddr) };
+    }
+
+    // Formato 3: ?origin=X&destination=Y (Maps API share link)
+    const origin = u.searchParams.get('origin');
+    const destination = u.searchParams.get('destination');
+    if (origin || destination) {
+      const parse = p => {
+        if (!p) return null;
+        const m = p.match(coordRe);
+        if (m) return { text: null, lat: parseFloat(m[1]), lon: parseFloat(m[2]) };
+        return { text: p, lat: null, lon: null };
+      };
+      return { origen: parse(origin), destino: parse(destination) };
     }
 
     return null;
