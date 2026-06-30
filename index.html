@@ -2988,7 +2988,8 @@ function corregirViaje(id) {
       </div>
 
       ${seccion('📅', 'Fecha y hora', 'fecha',
-        campo('Fecha y hora', 'ce_fecha', v.createdAt ? (()=>{ const d=new Date(v.createdAt); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); })() : '', 'datetime-local'),
+        campo('Fecha y hora del registro', 'ce_fecha', v.createdAt ? (()=>{ const d=new Date(v.createdAt); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); })() : '', 'datetime-local') +
+        (v.estado === 'programado' ? campo('📅 Fecha programada del viaje', 'ce_fecha_prog', v.fechaProgramada ? (()=>{ const d=new Date(v.fechaProgramada); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); })() : '', 'datetime-local') : ''),
         false
       )}
 
@@ -3174,6 +3175,8 @@ async function guardarCorreccion(id) {
   // Fecha
   const fechaVal = document.getElementById('ce_fecha')?.value;
   if (fechaVal) v.createdAt = new Date(fechaVal).getTime();
+  const fechaProg = document.getElementById('ce_fecha_prog')?.value;
+  if (fechaProg) v.fechaProgramada = new Date(fechaProg).getTime();
 
   // Cliente y vehículo
   v.cliente          = g('ce_cliente');
@@ -3217,6 +3220,7 @@ async function guardarCorreccion(id) {
 
   document.getElementById('modalCorreccion').remove();
   renderHistorial();
+  if (document.getElementById('pageProgramados')?.classList.contains('active')) renderProgramados();
 }
 
 async function copiarLink(id, btn){
@@ -3840,6 +3844,9 @@ function renderProgramados() {
         <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;">
           <div onclick="activarViajeProgramado('${v.id}')" style="padding:7px 12px;background:var(--accent);color:#000;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
             ▶ Activar ahora
+          </div>
+          <div onclick="corregirViaje('${v.id}')" style="padding:7px 10px;background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">
+            ✏️
           </div>
           <div onclick="eliminarViajeProgramado('${v.id}')" style="padding:7px 10px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">
             ✕
