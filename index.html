@@ -3798,6 +3798,9 @@ function renderPreviewTarifario(){
 }
 
 // ── PROGRAMADOS ───────────────────────────────────────────────
+const PROG_COLORS = ['#22C55E','#3B82F6','#F59E0B','#EC4899','#8B5CF6','#14B8A6','#EF4444','#F97316'];
+let _progMaps = {}; // mapId → L.map instance
+
 function renderProgramados() {
   const lista = document.getElementById('progLista');
   if (!lista) return;
@@ -3809,65 +3812,116 @@ function renderProgramados() {
     return;
   }
 
-  const now = Date.now();
-  lista.innerHTML = todos.map(v => {
-    const fp = v.fechaProgramada;
-    const fecha = fp ? new Date(fp) : null;
-    const esPasado = fp && fp < now;
-    const diaNombre = fecha ? fecha.toLocaleDateString('es-AR', {weekday:'long', day:'2-digit', month:'2-digit'}) : '—';
-    const hora = fecha ? fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit', hour12:false}) : '—';
-    const diffMs = fp - now;
-    const diffH = Math.floor(diffMs / 3600000);
-    const diffM = Math.floor((diffMs % 3600000) / 60000);
-    const restante = esPasado
-      ? `<span style="color:#EF4444;font-weight:600;">Vencido</span>`
-      : diffH > 0
-        ? `<span style="color:#8B5CF6;">en ${diffH}h ${diffM}m</span>`
-        : `<span style="color:#F59E0B;">en ${diffM}m</span>`;
+  // Agrupar por día
+  const porDia = {};
+  todos.forEach(v => {
+    const d = v.fechaProgramada ? new Date(v.fechaProgramada).toLocaleDateString('es-AR', {weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}) : 'Sin fecha';
+    if (!porDia[d]) porDia[d] = [];
+    porDia[d].push(v);
+  });
 
-    return `<div style="background:var(--surface);border:1px solid ${esPasado?'#EF4444':'var(--border)'};border-radius:10px;padding:14px 16px;margin-bottom:10px;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-        <div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;">
-            📅 ${diaNombre} · ${hora} hs &nbsp; ${restante}
+  const now = Date.now();
+
+  lista.innerHTML = Object.entries(porDia).map(([dia, viajes]) => {
+    const mapId = 'progmap_' + dia.replace(/\W/g,'_');
+    const hayCoords = viajes.some(v => v.oLat && v.dLat);
+
+    const cards = viajes.map((v, idx) => {
+      const fp = v.fechaProgramada;
+      const fecha = fp ? new Date(fp) : null;
+      const esPasado = fp && fp < now;
+      const hora = fecha ? fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit', hour12:false}) : '—';
+      const diffMs = fp - now;
+      const diffH = Math.floor(diffMs / 3600000);
+      const diffM = Math.floor((diffMs % 3600000) / 60000);
+      const restante = esPasado
+        ? `<span style="color:#EF4444;font-weight:600;">Vencido</span>`
+        : diffH > 0 ? `<span style="color:#8B5CF6;">en ${diffH}h ${diffM}m</span>`
+        : `<span style="color:#F59E0B;">en ${diffM}m</span>`;
+      const color = PROG_COLORS[idx % PROG_COLORS.length];
+      const num = idx + 1;
+
+      return `<div style="background:var(--surface);border:1px solid ${esPasado?'#EF4444':'var(--border)'};border-left:3px solid ${color};border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+        <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:${color};color:#000;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">${num}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;">
+            ${hora} hs &nbsp; ${restante}
           </div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             🟢 ${v.origen||'—'} → 🔴 ${v.destino||'—'}
           </div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
             ${v.cliente&&v.cliente!=='—'?`<span style="font-size:11px;color:var(--muted);">👤 ${v.cliente}</span>`:''}
             ${v.prestadorNombre&&v.prestadorNombre!=='—'?`<span style="font-size:11px;color:var(--muted);">🔧 ${v.prestadorNombre}</span>`:''}
             ${v.total?`<span style="font-size:11px;font-weight:600;color:var(--accent);">${fmt(v.total)}</span>`:''}
             ${v.km?`<span style="font-size:11px;color:var(--muted);">${v.km} km</span>`:''}
           </div>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;">
-          <div onclick="activarViajeProgramado('${v.id}')" style="padding:7px 12px;background:var(--accent);color:#000;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
-            ▶ Activar ahora
-          </div>
-          <div onclick="corregirViaje('${v.id}')" style="padding:7px 10px;background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">
-            ✏️
-          </div>
-          <div onclick="eliminarViajeProgramado('${v.id}')" style="padding:7px 10px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">
-            ✕
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+          <div onclick="activarViajeProgramado('${v.id}')" style="padding:6px 11px;background:var(--accent);color:#000;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;text-align:center;">▶ Activar</div>
+          <div style="display:flex;gap:4px;">
+            <div onclick="corregirViaje('${v.id}')" style="flex:1;padding:5px 8px;background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;text-align:center;">✏️</div>
+            <div onclick="eliminarViajeProgramado('${v.id}')" style="flex:1;padding:5px 8px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:5px;font-size:11px;cursor:pointer;text-align:center;">✕</div>
           </div>
         </div>
+      </div>`;
+    }).join('');
+
+    const mapSection = hayCoords ? `
+      <div id="${mapId}" style="height:200px;border-radius:8px;overflow:hidden;margin-bottom:12px;border:1px solid var(--border);"></div>` : '';
+
+    return `<div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+        📅 ${dia} · <span style="color:var(--text);">${viajes.length} viaje${viajes.length!==1?'s':''}</span>
       </div>
+      ${mapSection}
+      ${cards}
     </div>`;
   }).join('');
+
+  // Inicializar mapas por día
+  Object.entries(porDia).forEach(([dia, viajes]) => {
+    const mapId = 'progmap_' + dia.replace(/\W/g,'_');
+    const el = document.getElementById(mapId);
+    if (!el) return;
+    const vConCoords = viajes.filter(v => v.oLat && v.oLon && v.dLat && v.dLon);
+    if (!vConCoords.length) return;
+
+    // Destruir mapa anterior si existe
+    if (_progMaps[mapId]) { try { _progMaps[mapId].remove(); } catch(e){} delete _progMaps[mapId]; }
+
+    const m = L.map(mapId, {zoomControl:false, attributionControl:false});
+    _progMaps[mapId] = m;
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19}).addTo(m);
+
+    const bounds = [];
+    vConCoords.forEach((v, idx) => {
+      const color = PROG_COLORS[viajes.indexOf(v) % PROG_COLORS.length];
+      const num = viajes.indexOf(v) + 1;
+      const mkIcon = (letra, col) => L.divIcon({className:'',
+        html:`<div style="background:${col};color:#000;font-size:10px;font-weight:800;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.4);">${letra}</div>`,
+        iconAnchor:[10,10]});
+      L.marker([v.oLat, v.oLon], {icon: mkIcon(num+'A', color)}).addTo(m);
+      L.marker([v.dLat, v.dLon], {icon: mkIcon(num+'B', color)}).addTo(m);
+      L.polyline([[v.oLat,v.oLon],[v.dLat,v.dLon]], {color, weight:2.5, opacity:0.7, dashArray:'6,4'}).addTo(m);
+      bounds.push([v.oLat,v.oLon],[v.dLat,v.dLon]);
+    });
+    if (bounds.length) m.fitBounds(bounds, {padding:[16,16]});
+    setTimeout(() => m.invalidateSize(), 80);
+  });
 }
 
 async function activarViajeProgramado(id) {
   const v = _historialCache.find(x => x.id === id);
   if (!v) return;
   v.estado = 'pendiente';
+  v.createdAt = Date.now(); // fecha de activación efectiva
   v.timestamps = { pendiente: Date.now() };
   delete v.fechaProgramada;
   await guardarViajeActivo(v);
   await guardarEnHistorial(v);
   actualizarContadorHistorial();
   renderProgramados();
-  // Copiar link al portapapeles si es posible
   const baseUrl = window.location.href.split('?')[0];
   const link = `${baseUrl}?viaje=${id}`;
   try { await navigator.clipboard.writeText(link); } catch(e) {}
