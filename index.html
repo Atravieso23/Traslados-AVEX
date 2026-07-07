@@ -2412,8 +2412,9 @@ let _viajesActivosCache = {};
 
 async function guardarViajeActivo(viaje) {
   _viajesActivosCache[viaje.id] = viaje;
+  const { routeCoords: _rc, ...viajeSlim } = viaje; // no guardar routeCoords en Supabase
   const { error } = await sb.from('viajes_activos').upsert(
-    { viaje_id: viaje.id, data: viaje, updated_at: new Date().toISOString() },
+    { viaje_id: viaje.id, data: viajeSlim, updated_at: new Date().toISOString() },
     { onConflict: 'viaje_id' }
   );
   if (error) console.error('Error guardando viaje activo:', error);
@@ -2534,7 +2535,7 @@ async function confirmarViaje(){
 function iniciarMonitoreo(viajeId){
   if(monitorInterval)clearInterval(monitorInterval);
   actualizarMonitor(viajeId);
-  monitorInterval=setInterval(()=>actualizarMonitor(viajeId),3000);
+  monitorInterval=setInterval(()=>actualizarMonitor(viajeId),10000);
 }
 
 async function actualizarMonitor(viajeId){
@@ -2639,9 +2640,10 @@ async function guardarEnHistorial(viaje) {
   if (idx >= 0) _historialCache[idx] = viaje;
   else _historialCache.unshift(viaje);
 
-  // Guardar en Supabase (upsert por id del viaje)
+  // Guardar en Supabase sin routeCoords (reduce egress significativamente)
+  const { routeCoords: _rc, ...viajeSlim } = viaje;
   const { error } = await sb.from('viajes').upsert(
-    { viaje_id: viaje.id, data: viaje, created_at: new Date(viaje.createdAt).toISOString() },
+    { viaje_id: viaje.id, data: viajeSlim, created_at: new Date(viaje.createdAt).toISOString() },
     { onConflict: 'viaje_id' }
   );
   if (error) console.error('Error guardando viaje:', error);
@@ -4947,7 +4949,13 @@ function pRender() {
     const mkP = (lbl,col) => L.divIcon({className:'', html:`<div style="background:${col};color:#000;font-family:Inter,sans-serif;font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;white-space:nowrap;">${lbl}</div>`, iconAnchor:[0,0]});
     L.marker([v.oLat,v.oLon],{icon:mkP('A · Origen','#22C55E')}).addTo(pMapObj);
     L.marker([v.dLat,v.dLon],{icon:mkP('B · Destino','#F59E0B')}).addTo(pMapObj);
-    if (v.routeCoords?.length){const poly=L.polyline(v.routeCoords,{color:'#22C55E',weight:3,opacity:.8}).addTo(pMapObj);pMapObj.fitBounds(poly.getBounds(),{padding:[30,30]});}
+    if (v.routeCoords?.length){
+      const poly=L.polyline(v.routeCoords,{color:'#22C55E',weight:3,opacity:.8}).addTo(pMapObj);pMapObj.fitBounds(poly.getBounds(),{padding:[30,30]});
+    } else if (v.dLat && v.dLon) {
+      // routeCoords ya no se guarda en Supabase — dibujar línea directa y ajustar bounds
+      L.polyline([[v.oLat,v.oLon],[v.dLat,v.dLon]],{color:'#22C55E',weight:2,opacity:.6,dashArray:'6,4'}).addTo(pMapObj);
+      pMapObj.fitBounds([[v.oLat,v.oLon],[v.dLat,v.dLon]],{padding:[30,30]});
+    }
   }
 
   // Botón de acción fijo abajo
@@ -4993,7 +5001,7 @@ async function initModoPrestador() {
           _viajesActivosCache[pViaje.id] = pViaje;
           pRender();
         }
-      }, 3000);
+      }, 10000);
       return true;
     }
 
@@ -5086,10 +5094,10 @@ async function init() {
   renderCalcTipoPills();
   renderPrestadorSelect();
   actualizarContadorHistorial();
-  setInterval(()=>{ if(viajeActivoId) actualizarMonitor(viajeActivoId); }, 3000);
+  setInterval(()=>{ if(viajeActivoId) actualizarMonitor(viajeActivoId); }, 10000);
 
   // Sync periódico: actualiza estados de viajes activos en el historial
-  setInterval(sincronizarEstadosActivos, 8000);
+  setInterval(sincronizarEstadosActivos, 20000);
 }
 
 async function sincronizarEstadosActivos() {
